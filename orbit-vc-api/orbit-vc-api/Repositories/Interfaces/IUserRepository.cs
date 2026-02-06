@@ -6,6 +6,7 @@ namespace orbit_vc_api.Repositories.Interfaces
     {
         Task<User?> GetByIdAsync(Guid id);
         Task<User?> GetByEmailAsync(string email);
+        Task<User?> GetByEmailOrMobileAsync(string emailOrMobile);
         Task<User?> GetByUserIdAsync(string userId);
         Task<IEnumerable<User>> GetAllAsync();
         Task<Guid> CreateAsync(User user);

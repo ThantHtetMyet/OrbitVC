@@ -107,8 +107,8 @@ const Login = () => {
 
                         <div className="login-footer-row">
                             <div className="login-footer-links">
-                                <Link to="/forgot-password" className="forgot-link">
-                                    Forgot Password?
+                                <Link to="/forgot" className="forgot-link">
+                                    Forgot UserID / Password?
                                 </Link>
                                 <span className="footer-separator"></span>
                                 <p className="login-signup-link">

@@ -2,7 +2,7 @@ namespace orbit_vc_api.Models.DTOs
 {
     public class ForgotPasswordRequest
     {
-        public string Email { get; set; } = string.Empty;
+        public string UserID { get; set; } = string.Empty;
     }
 
     public class ResetPasswordRequest

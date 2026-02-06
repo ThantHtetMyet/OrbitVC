@@ -64,6 +64,29 @@ namespace orbit_vc_api.Repositories
             return result.FirstOrDefault();
         }
 
+        public async Task<User?> GetByEmailOrMobileAsync(string emailOrMobile)
+        {
+            using var connection = CreateConnection();
+            const string sql = @"
+                SELECT u.*, ur.ID, ur.RoleName, ur.Description
+                FROM Users u
+                LEFT JOIN UserRoles ur ON u.UserRoleID = ur.ID
+                WHERE (u.Email LIKE @InputPattern OR u.MobileNo LIKE @InputPattern) AND u.IsDeleted = 0";
+            
+            var result = await connection.QueryAsync<User, UserRole, User>(
+                sql,
+                (user, role) =>
+                {
+                    user.UserRole = role;
+                    return user;
+                },
+                new { InputPattern = $"%{emailOrMobile}%" },
+                splitOn: "ID"
+            );
+            
+            return result.FirstOrDefault();
+        }
+
         public async Task<User?> GetByUserIdAsync(string userId)
         {
             using var connection = CreateConnection();

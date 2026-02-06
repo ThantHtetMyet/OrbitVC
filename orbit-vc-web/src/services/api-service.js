@@ -146,8 +146,15 @@ class ApiService {
     /**
      * Request password reset
      */
-    async forgotPassword(email) {
-        return await this.post('/Auth/forgot-password', { email });
+    async forgotPassword(userId) {
+        return await this.post('/Auth/forgot-password', { userId });
+    }
+
+    /**
+     * Request UserID retrieval
+     */
+    async forgotUserID(emailOrMobile) {
+        return await this.post('/Auth/forgot-userid', { emailOrMobile });
     }
 
     /**

@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Login, SignUp, ForgotPassword } from './Pages/User';
+import { Login, SignUp, Forgot } from './Pages/User';
 import './App.css';
 
 // Simple Dashboard placeholder component
@@ -51,7 +51,8 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<SignUp />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/forgot" element={<Forgot />} />
+        <Route path="/forgot-password" element={<Forgot />} />
         <Route
           path="/dashboard"
           element={

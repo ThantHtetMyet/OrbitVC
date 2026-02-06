@@ -250,38 +250,40 @@ namespace orbit_vc_api.Controllers
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(request.Email))
+                if (string.IsNullOrWhiteSpace(request.UserID))
                 {
                     return BadRequest(new AuthResponse
                     {
                         Success = false,
-                        Message = "Email is required."
+                        Message = "UserID is required."
                     });
                 }
 
-                var user = await _userRepository.GetByEmailAsync(request.Email);
+                var user = await _userRepository.GetByUserIdAsync(request.UserID);
 
-                // Always return success to prevent email enumeration
+                // Always return success to prevent enumeration, or return specific message if user not found per requirement?
+                // "system will send reset password link via email"
                 if (user == null)
                 {
+                     // For security, usually we don't reveal if user exists. 
+                     // But strictly following user flow 'type userID and system will send...'
                     return Ok(new AuthResponse
                     {
                         Success = true,
-                        Message = "If an account with this email exists, a password reset link has been sent."
+                        Message = "If an account with this UserID exists, a password reset link has been sent to the registered email."
                     });
                 }
 
                 // In production, generate a reset token and send email
-                // For now, we'll just return a success message
                 var resetToken = GenerateResetToken();
 
-                // TODO: Store reset token in database and send email
-                _logger.LogInfo($"Password reset requested for {request.Email}. Token: {resetToken}");
+                // TODO: Store reset token in database and send email to user.Email
+                _logger.LogInfo($"Password reset requested for UserID {request.UserID} (Email: {user.Email}). Token: {resetToken}");
 
                 return Ok(new AuthResponse
                 {
                     Success = true,
-                    Message = "If an account with this email exists, a password reset link has been sent."
+                    Message = "A password reset link has been sent to your registered email."
                 });
             }
             catch (Exception ex)
@@ -291,6 +293,55 @@ namespace orbit_vc_api.Controllers
                 {
                     Success = false,
                     Message = "An error occurred. Please try again later."
+                });
+            }
+        }
+
+        [HttpPost("forgot-userid")]
+        public async Task<ActionResult<AuthResponse>> ForgotUserID([FromBody] ForgotUserIDRequest request)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(request.EmailOrMobile))
+                {
+                    return BadRequest(new AuthResponse
+                    {
+                        Success = false,
+                        Message = "Email or Mobile No is required."
+                    });
+                }
+
+                var user = await _userRepository.GetByEmailOrMobileAsync(request.EmailOrMobile);
+
+                if (user == null)
+                {
+                    return Ok(new AuthResponse
+                    {
+                        Success = false,
+                        Message = "User not found."
+                    });
+                }
+
+                // Return UserID for real-time display
+                // Note: Is this a security risk? User asked for "show real time result".
+                // I will return it in the Message or a specific property if I extended AuthResponse, 
+                // simpler to return it in Message or define a new property. Use Message for now or generic object?
+                // AuthResponse has Token/UserDto. I can put UserID in UserDto.
+                
+                return Ok(new AuthResponse
+                {
+                    Success = true,
+                    Message = "User found.",
+                    User = new UserDto { UserID = user.UserID }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error during forgot userid", ex);
+                return StatusCode(500, new AuthResponse
+                {
+                    Success = false,
+                    Message = "An error occurred."
                 });
             }
         }
