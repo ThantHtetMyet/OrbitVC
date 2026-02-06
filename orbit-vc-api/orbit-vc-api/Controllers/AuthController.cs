@@ -13,12 +13,12 @@ namespace orbit_vc_api.Controllers
     {
         private readonly IUserRepository _userRepository;
         private readonly IUserRoleRepository _userRoleRepository;
-        private readonly ILogger<AuthController> _logger;
+        private readonly orbit_vc_api.Services.ILoggerService _logger;
 
         public AuthController(
             IUserRepository userRepository,
             IUserRoleRepository userRoleRepository,
-            ILogger<AuthController> logger)
+            orbit_vc_api.Services.ILoggerService logger)
         {
             _userRepository = userRepository;
             _userRoleRepository = userRoleRepository;
@@ -30,23 +30,23 @@ namespace orbit_vc_api.Controllers
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
+                if (string.IsNullOrWhiteSpace(request.UserID) || string.IsNullOrWhiteSpace(request.Password))
                 {
                     return BadRequest(new AuthResponse
                     {
                         Success = false,
-                        Message = "Email and password are required."
+                        Message = "UserID and password are required."
                     });
                 }
 
-                var user = await _userRepository.GetByEmailAsync(request.Email);
+                var user = await _userRepository.GetByUserIdAsync(request.UserID);
 
                 if (user == null)
                 {
                     return Unauthorized(new AuthResponse
                     {
                         Success = false,
-                        Message = "Invalid email or password."
+                        Message = "Invalid UserID or password."
                     });
                 }
 
@@ -57,7 +57,7 @@ namespace orbit_vc_api.Controllers
                     return Unauthorized(new AuthResponse
                     {
                         Success = false,
-                        Message = "Invalid email or password."
+                        Message = "Invalid UserID or password."
                     });
                 }
 
@@ -76,6 +76,8 @@ namespace orbit_vc_api.Controllers
                 // Generate a simple token (in production, use JWT)
                 var token = GenerateToken(user.ID);
 
+                _logger.LogInfo($"User {user.UserID} logged in successfully.");
+
                 return Ok(new AuthResponse
                 {
                     Success = true,
@@ -84,6 +86,7 @@ namespace orbit_vc_api.Controllers
                     User = new UserDto
                     {
                         ID = user.ID,
+                        UserID = user.UserID,
                         FirstName = user.FirstName,
                         LastName = user.LastName,
                         Email = user.Email,
@@ -93,7 +96,7 @@ namespace orbit_vc_api.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during login");
+                _logger.LogError("Error during login", ex);
                 return StatusCode(500, new AuthResponse
                 {
                     Success = false,
@@ -108,7 +111,8 @@ namespace orbit_vc_api.Controllers
             try
             {
                 // Validation
-                if (string.IsNullOrWhiteSpace(request.Email) ||
+                if (string.IsNullOrWhiteSpace(request.UserID) ||
+                    string.IsNullOrWhiteSpace(request.Email) ||
                     string.IsNullOrWhiteSpace(request.Password) ||
                     string.IsNullOrWhiteSpace(request.FirstName) ||
                     string.IsNullOrWhiteSpace(request.LastName))
@@ -138,6 +142,16 @@ namespace orbit_vc_api.Controllers
                     });
                 }
 
+                // Check if UserID already exists
+                if (await _userRepository.UserIdExistsAsync(request.UserID))
+                {
+                    return BadRequest(new AuthResponse
+                    {
+                        Success = false,
+                        Message = "This UserID is already taken."
+                    });
+                }
+
                 // Check if email already exists
                 if (await _userRepository.EmailExistsAsync(request.Email))
                 {
@@ -148,28 +162,45 @@ namespace orbit_vc_api.Controllers
                     });
                 }
 
-                // Get default user role (or create one if it doesn't exist)
-                var defaultRole = await _userRoleRepository.GetByNameAsync("User");
+                // Get user role
                 Guid roleId;
-
-                if (defaultRole == null)
+                if (request.UserRoleID.HasValue && request.UserRoleID != Guid.Empty)
                 {
-                    // Create default User role
-                    var newRole = new UserRole
+                    var requestedRole = await _userRoleRepository.GetByIdAsync(request.UserRoleID.Value);
+                    if (requestedRole == null)
                     {
-                        RoleName = "User",
-                        Description = "Default user role"
-                    };
-                    roleId = await _userRoleRepository.CreateAsync(newRole);
+                        return BadRequest(new AuthResponse
+                        {
+                            Success = false,
+                            Message = "Invalid User Role selected."
+                        });
+                    }
+                    roleId = requestedRole.ID;
                 }
                 else
                 {
-                    roleId = defaultRole.ID;
+                    // Default to 'User' role
+                    var defaultRole = await _userRoleRepository.GetByNameAsync("User");
+                    if (defaultRole == null)
+                    {
+                        // Create default User role if missing
+                        var newRole = new UserRole
+                        {
+                            RoleName = "User",
+                            Description = "Default user role"
+                        };
+                        roleId = await _userRoleRepository.CreateAsync(newRole);
+                    }
+                    else
+                    {
+                        roleId = defaultRole.ID;
+                    }
                 }
 
                 // Create new user
                 var user = new User
                 {
+                    UserID = request.UserID,
                     FirstName = request.FirstName,
                     LastName = request.LastName,
                     Email = request.Email,
@@ -185,6 +216,8 @@ namespace orbit_vc_api.Controllers
                 // Generate token
                 var token = GenerateToken(userId);
 
+                _logger.LogInfo($"New user {user.UserID} registered successfully.");
+
                 return Ok(new AuthResponse
                 {
                     Success = true,
@@ -193,6 +226,7 @@ namespace orbit_vc_api.Controllers
                     User = new UserDto
                     {
                         ID = userId,
+                        UserID = user.UserID,
                         FirstName = user.FirstName,
                         LastName = user.LastName,
                         Email = user.Email,
@@ -202,7 +236,7 @@ namespace orbit_vc_api.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during signup");
+                _logger.LogError("Error during signup", ex);
                 return StatusCode(500, new AuthResponse
                 {
                     Success = false,
@@ -242,7 +276,7 @@ namespace orbit_vc_api.Controllers
                 var resetToken = GenerateResetToken();
 
                 // TODO: Store reset token in database and send email
-                _logger.LogInformation($"Password reset requested for {request.Email}. Token: {resetToken}");
+                _logger.LogInfo($"Password reset requested for {request.Email}. Token: {resetToken}");
 
                 return Ok(new AuthResponse
                 {
@@ -252,7 +286,7 @@ namespace orbit_vc_api.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during forgot password");
+                _logger.LogError("Error during forgot password", ex);
                 return StatusCode(500, new AuthResponse
                 {
                     Success = false,
@@ -320,7 +354,7 @@ namespace orbit_vc_api.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during password reset");
+                _logger.LogError("Error during password reset", ex);
                 return StatusCode(500, new AuthResponse
                 {
                     Success = false,

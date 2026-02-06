@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://localhost:7001/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://localhost:7003/api';
 
 /**
  * API Service for handling all HTTP requests to the backend
@@ -29,7 +29,7 @@ class ApiService {
      */
     async handleResponse(response) {
         const data = await response.json();
-        
+
         if (!response.ok) {
             throw new Error(data.message || 'An error occurred');
         }
@@ -118,9 +118,9 @@ class ApiService {
     /**
      * Login user
      */
-    async login(email, password) {
-        const response = await this.post('/Auth/login', { email, password });
-        
+    async login(userId, password) {
+        const response = await this.post('/Auth/login', { userId, password });
+
         if (response.success && response.token) {
             localStorage.setItem('authToken', response.token);
             localStorage.setItem('user', JSON.stringify(response.user));
@@ -134,7 +134,7 @@ class ApiService {
      */
     async signUp(userData) {
         const response = await this.post('/Auth/signup', userData);
-        
+
         if (response.success && response.token) {
             localStorage.setItem('authToken', response.token);
             localStorage.setItem('user', JSON.stringify(response.user));
@@ -160,6 +160,13 @@ class ApiService {
             newPassword,
             confirmPassword,
         });
+    }
+
+    /**
+     * Get all user roles
+     */
+    async getUserRoles() {
+        return await this.get('/UserRole');
     }
 
     /**

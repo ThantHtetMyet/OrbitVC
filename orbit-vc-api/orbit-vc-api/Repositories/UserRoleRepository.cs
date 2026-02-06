@@ -21,21 +21,21 @@ namespace orbit_vc_api.Repositories
         public async Task<UserRole?> GetByIdAsync(Guid id)
         {
             using var connection = CreateConnection();
-            const string sql = "SELECT * FROM UserRole WHERE ID = @Id AND IsDeleted = 0";
+            const string sql = "SELECT * FROM UserRoles WHERE ID = @Id AND IsDeleted = 0";
             return await connection.QueryFirstOrDefaultAsync<UserRole>(sql, new { Id = id });
         }
 
         public async Task<UserRole?> GetByNameAsync(string roleName)
         {
             using var connection = CreateConnection();
-            const string sql = "SELECT * FROM UserRole WHERE RoleName = @RoleName AND IsDeleted = 0";
+            const string sql = "SELECT * FROM UserRoles WHERE RoleName = @RoleName AND IsDeleted = 0";
             return await connection.QueryFirstOrDefaultAsync<UserRole>(sql, new { RoleName = roleName });
         }
 
         public async Task<IEnumerable<UserRole>> GetAllAsync()
         {
             using var connection = CreateConnection();
-            const string sql = "SELECT * FROM UserRole WHERE IsDeleted = 0 ORDER BY RoleName";
+            const string sql = "SELECT * FROM UserRoles WHERE IsDeleted = 0 ORDER BY RoleName";
             return await connection.QueryAsync<UserRole>(sql);
         }
 
@@ -48,7 +48,7 @@ namespace orbit_vc_api.Repositories
             userRole.IsDeleted = false;
 
             const string sql = @"
-                INSERT INTO UserRole (ID, RoleName, Description, IsDeleted, CreatedDate, UpdatedDate, CreatedBy, UpdatedBy)
+                INSERT INTO UserRoles (ID, RoleName, Description, IsDeleted, CreatedDate, UpdatedDate, CreatedBy, UpdatedBy)
                 VALUES (@ID, @RoleName, @Description, @IsDeleted, @CreatedDate, @UpdatedDate, @CreatedBy, @UpdatedBy)";
 
             await connection.ExecuteAsync(sql, userRole);
@@ -61,7 +61,7 @@ namespace orbit_vc_api.Repositories
             userRole.UpdatedDate = DateTime.UtcNow;
 
             const string sql = @"
-                UPDATE UserRole 
+                UPDATE UserRoles 
                 SET RoleName = @RoleName,
                     Description = @Description,
                     UpdatedDate = @UpdatedDate,
@@ -76,7 +76,7 @@ namespace orbit_vc_api.Repositories
         {
             using var connection = CreateConnection();
             const string sql = @"
-                UPDATE UserRole 
+                UPDATE UserRoles 
                 SET IsDeleted = 1, UpdatedDate = @UpdatedDate
                 WHERE ID = @Id";
 

@@ -22,9 +22,9 @@ namespace orbit_vc_api.Repositories
         {
             using var connection = CreateConnection();
             const string sql = @"
-                SELECT u.*, ur.RoleName, ur.Description as RoleDescription
-                FROM [User] u
-                LEFT JOIN UserRole ur ON u.UserRoleID = ur.ID
+                SELECT u.*, ur.ID, ur.RoleName, ur.Description
+                FROM Users u
+                LEFT JOIN UserRoles ur ON u.UserRoleID = ur.ID
                 WHERE u.ID = @Id AND u.IsDeleted = 0";
             
             var result = await connection.QueryAsync<User, UserRole, User>(
@@ -35,7 +35,7 @@ namespace orbit_vc_api.Repositories
                     return user;
                 },
                 new { Id = id },
-                splitOn: "RoleName"
+                splitOn: "ID"
             );
             
             return result.FirstOrDefault();
@@ -46,8 +46,8 @@ namespace orbit_vc_api.Repositories
             using var connection = CreateConnection();
             const string sql = @"
                 SELECT u.*, ur.ID, ur.RoleName, ur.Description
-                FROM [User] u
-                LEFT JOIN UserRole ur ON u.UserRoleID = ur.ID
+                FROM Users u
+                LEFT JOIN UserRoles ur ON u.UserRoleID = ur.ID
                 WHERE u.Email = @Email AND u.IsDeleted = 0";
             
             var result = await connection.QueryAsync<User, UserRole, User>(
@@ -64,13 +64,36 @@ namespace orbit_vc_api.Repositories
             return result.FirstOrDefault();
         }
 
+        public async Task<User?> GetByUserIdAsync(string userId)
+        {
+            using var connection = CreateConnection();
+            const string sql = @"
+                SELECT u.*, ur.ID, ur.RoleName, ur.Description
+                FROM Users u
+                LEFT JOIN UserRoles ur ON u.UserRoleID = ur.ID
+                WHERE u.UserID = @UserId AND u.IsDeleted = 0";
+            
+            var result = await connection.QueryAsync<User, UserRole, User>(
+                sql,
+                (user, role) =>
+                {
+                    user.UserRole = role;
+                    return user;
+                },
+                new { UserId = userId },
+                splitOn: "ID"
+            );
+            
+            return result.FirstOrDefault();
+        }
+
         public async Task<IEnumerable<User>> GetAllAsync()
         {
             using var connection = CreateConnection();
             const string sql = @"
                 SELECT u.*, ur.ID, ur.RoleName, ur.Description
-                FROM [User] u
-                LEFT JOIN UserRole ur ON u.UserRoleID = ur.ID
+                FROM Users u
+                LEFT JOIN UserRoles ur ON u.UserRoleID = ur.ID
                 WHERE u.IsDeleted = 0
                 ORDER BY u.CreatedDate DESC";
             
@@ -97,11 +120,11 @@ namespace orbit_vc_api.Repositories
             user.IsActive = true;
 
             const string sql = @"
-                INSERT INTO [User] 
-                (ID, UserRoleID, FirstName, LastName, Email, MobileNo, LoginPassword, 
+                INSERT INTO Users 
+                (ID, UserRoleID, UserID, FirstName, LastName, Email, MobileNo, LoginPassword, 
                  Remark, IsActive, IsDeleted, CreatedDate, UpdatedDate, CreatedBy, UpdatedBy)
                 VALUES 
-                (@ID, @UserRoleID, @FirstName, @LastName, @Email, @MobileNo, @LoginPassword,
+                (@ID, @UserRoleID, @UserID, @FirstName, @LastName, @Email, @MobileNo, @LoginPassword,
                  @Remark, @IsActive, @IsDeleted, @CreatedDate, @UpdatedDate, @CreatedBy, @UpdatedBy)";
 
             await connection.ExecuteAsync(sql, user);
@@ -114,8 +137,9 @@ namespace orbit_vc_api.Repositories
             user.UpdatedDate = DateTime.UtcNow;
 
             const string sql = @"
-                UPDATE [User] 
-                SET FirstName = @FirstName,
+                UPDATE Users 
+                SET UserID = @UserID,
+                    FirstName = @FirstName,
                     LastName = @LastName,
                     Email = @Email,
                     MobileNo = @MobileNo,
@@ -134,7 +158,7 @@ namespace orbit_vc_api.Repositories
         {
             using var connection = CreateConnection();
             const string sql = @"
-                UPDATE [User] 
+                UPDATE Users 
                 SET IsDeleted = 1, UpdatedDate = @UpdatedDate
                 WHERE ID = @Id";
 
@@ -146,7 +170,7 @@ namespace orbit_vc_api.Repositories
         {
             using var connection = CreateConnection();
             const string sql = @"
-                UPDATE [User] 
+                UPDATE Users 
                 SET LastLogin = @LastLogin
                 WHERE ID = @Id AND IsDeleted = 0";
 
@@ -158,7 +182,7 @@ namespace orbit_vc_api.Repositories
         {
             using var connection = CreateConnection();
             const string sql = @"
-                UPDATE [User] 
+                UPDATE Users 
                 SET LoginPassword = @Password, UpdatedDate = @UpdatedDate
                 WHERE ID = @Id AND IsDeleted = 0";
 
@@ -170,8 +194,16 @@ namespace orbit_vc_api.Repositories
         public async Task<bool> EmailExistsAsync(string email)
         {
             using var connection = CreateConnection();
-            const string sql = "SELECT COUNT(1) FROM [User] WHERE Email = @Email AND IsDeleted = 0";
+            const string sql = "SELECT COUNT(1) FROM Users WHERE Email = @Email AND IsDeleted = 0";
             var count = await connection.ExecuteScalarAsync<int>(sql, new { Email = email });
+            return count > 0;
+        }
+
+        public async Task<bool> UserIdExistsAsync(string userId)
+        {
+            using var connection = CreateConnection();
+            const string sql = "SELECT COUNT(1) FROM Users WHERE UserID = @UserId AND IsDeleted = 0";
+            var count = await connection.ExecuteScalarAsync<int>(sql, new { UserId = userId });
             return count > 0;
         }
     }

@@ -4,6 +4,7 @@ namespace orbit_vc_api.Models
     {
         public Guid ID { get; set; }
         public Guid UserRoleID { get; set; }
+        public string UserID { get; set; } = string.Empty; // nvarchar(100), not null
         public string FirstName { get; set; } = string.Empty;
         public string LastName { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;

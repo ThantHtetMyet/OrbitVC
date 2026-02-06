@@ -11,6 +11,7 @@ namespace orbit_vc_api.Models.DTOs
     public class UserDto
     {
         public Guid ID { get; set; }
+        public string UserID { get; set; } = string.Empty;
         public string FirstName { get; set; } = string.Empty;
         public string LastName { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;

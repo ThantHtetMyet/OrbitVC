@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import apiService from '../../services/api-service';
+import CursorAnimation from '../../components/CursorAnimation';
 import './User.css';
 
 const ForgotPassword = () => {
@@ -37,11 +38,7 @@ const ForgotPassword = () => {
 
     return (
         <div className="auth-container">
-            <div className="auth-background">
-                <div className="auth-gradient-orb orb-1"></div>
-                <div className="auth-gradient-orb orb-2"></div>
-                <div className="auth-gradient-orb orb-3"></div>
-            </div>
+            <CursorAnimation />
 
             <div className="auth-card">
                 <div className="auth-header">

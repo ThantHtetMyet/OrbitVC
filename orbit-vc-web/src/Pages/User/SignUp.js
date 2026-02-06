@@ -1,21 +1,58 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import apiService from '../../services/api-service';
-import './User.css';
+import CursorAnimation from '../../components/CursorAnimation';
+import Modal from '../../components/Modal';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 const SignUp = () => {
     const navigate = useNavigate();
     const [formData, setFormData] = useState({
+        userId: '',
         firstName: '',
         lastName: '',
         email: '',
         mobileNo: '',
         password: '',
         confirmPassword: '',
+        userRoleID: ''
     });
-    const [error, setError] = useState('');
+    // const [error, setError] = useState(''); // Removed standard error state
     const [loading, setLoading] = useState(false);
     const [passwordStrength, setPasswordStrength] = useState(0);
+    const [animateIn, setAnimateIn] = useState(false);
+    const [roles, setRoles] = useState([]);
+
+    // Modal State
+    const [modalConfig, setModalConfig] = useState({
+        isOpen: false,
+        title: '',
+        message: '',
+        type: 'info', // success, error, info
+        onConfirm: null
+    });
+
+    // Trigger animation on page load AND fetch roles
+    useEffect(() => {
+        setAnimateIn(true);
+        fetchRoles();
+    }, []);
+
+    const fetchRoles = async () => {
+        try {
+            const data = await apiService.getUserRoles();
+            setRoles(data);
+            // Set default to 'User' if exists
+            const userRole = data.find(r => r.roleName === 'User');
+            if (userRole) {
+                setFormData(prev => ({ ...prev, userRoleID: userRole.id }));
+            } else if (data.length > 0) {
+                setFormData(prev => ({ ...prev, userRoleID: data[0].id }));
+            }
+        } catch (err) {
+            console.error('Failed to fetch roles:', err);
+        }
+    };
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -23,7 +60,7 @@ const SignUp = () => {
             ...prev,
             [name]: value
         }));
-        setError('');
+        // setError(''); // No need
 
         // Calculate password strength
         if (name === 'password') {
@@ -64,21 +101,35 @@ const SignUp = () => {
         }
     };
 
+    const showModal = (title, message, type = 'info', onConfirm = null) => {
+        setModalConfig({
+            isOpen: true,
+            title,
+            message,
+            type,
+            onConfirm
+        });
+    };
+
+    const closeModal = () => {
+        setModalConfig(prev => ({ ...prev, isOpen: false }));
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        setError('');
+        // setError('');
 
         // Validation
         if (formData.password !== formData.confirmPassword) {
-            setError('Passwords do not match');
             setLoading(false);
+            showModal('Validation Error', 'Passwords do not match', 'error');
             return;
         }
 
         if (formData.password.length < 6) {
-            setError('Password must be at least 6 characters long');
             setLoading(false);
+            showModal('Validation Error', 'Password must be at least 6 characters long', 'error');
             return;
         }
 
@@ -86,12 +137,14 @@ const SignUp = () => {
             const response = await apiService.signUp(formData);
 
             if (response.success) {
-                navigate('/dashboard');
+                showModal('Account Created', 'Your account has been created successfully.', 'success', () => {
+                    navigate('/login');
+                });
             } else {
-                setError(response.message || 'Registration failed');
+                showModal('Registration Failed', response.message || 'Registration failed', 'error');
             }
         } catch (err) {
-            setError(err.message || 'An error occurred during registration');
+            showModal('Error', err.message || 'An error occurred during registration', 'error');
         } finally {
             setLoading(false);
         }
@@ -99,174 +152,221 @@ const SignUp = () => {
 
     return (
         <div className="auth-container">
-            <div className="auth-background">
-                <div className="auth-gradient-orb orb-1"></div>
-                <div className="auth-gradient-orb orb-2"></div>
-                <div className="auth-gradient-orb orb-3"></div>
+            <CursorAnimation />
+
+            {/* Loading Overlay */}
+            {loading && <LoadingSpinner fullScreen={true} size="small" />}
+
+            {/* Modal */}
+            <Modal
+                isOpen={modalConfig.isOpen}
+                onClose={closeModal}
+                title={modalConfig.title}
+                message={modalConfig.message}
+                type={modalConfig.type}
+                onConfirm={modalConfig.onConfirm}
+            />
+
+            {/* Title Container */}
+            <div className={`title-container ${animateIn ? 'animate-in' : ''}`}>
+
+                <h1 className="main-title">OrbitVC</h1>
             </div>
 
-            <div className="auth-card signup-card">
-                <div className="auth-header">
-                    <div className="auth-logo">
-                        <span className="logo-icon">🚀</span>
-                    </div>
-                    <h1 className="auth-title">Create Account</h1>
-                    <p className="auth-subtitle">Join us and start your journey</p>
-                </div>
+            <div className={`auth-card signup-card signup-wide ${animateIn ? 'animate-in-delay' : ''}`}>
 
-                <form onSubmit={handleSubmit} className="auth-form">
-                    {error && (
-                        <div className="auth-error">
-                            <span className="error-icon">⚠️</span>
-                            {error}
-                        </div>
-                    )}
+                {/* Right Panel - Form */}
+                <div className="signup-form-panel">
+                    <form onSubmit={handleSubmit} className="auth-form signup-grid-form">
 
-                    <div className="form-row">
-                        <div className="form-group">
-                            <label htmlFor="firstName" className="form-label">First Name</label>
-                            <div className="input-wrapper">
-                                <span className="input-icon">👤</span>
-                                <input
-                                    type="text"
-                                    id="firstName"
-                                    name="firstName"
-                                    value={formData.firstName}
-                                    onChange={handleChange}
-                                    placeholder="First name"
-                                    className="form-input"
-                                    required
-                                />
-                            </div>
-                        </div>
+                        {/* Removed inline Error display */}
 
-                        <div className="form-group">
-                            <label htmlFor="lastName" className="form-label">Last Name</label>
-                            <div className="input-wrapper">
-                                <span className="input-icon">👤</span>
-                                <input
-                                    type="text"
-                                    id="lastName"
-                                    name="lastName"
-                                    value={formData.lastName}
-                                    onChange={handleChange}
-                                    placeholder="Last name"
-                                    className="form-input"
-                                    required
-                                />
-                            </div>
-                        </div>
-                    </div>
+                        <div className="signup-split-layout">
+                            {/* Left Column */}
+                            <div className="signup-column left">
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label htmlFor="userId" className="form-label">UserID</label>
+                                        <div className="input-wrapper">
+                                            <input
+                                                type="text"
+                                                id="userId"
+                                                name="userId"
+                                                value={formData.userId}
+                                                onChange={handleChange}
+                                                placeholder="Choose UserID"
+                                                className="form-input no-icon"
+                                                required
+                                                maxLength={100}
+                                            />
+                                        </div>
+                                    </div>
 
-                    <div className="form-group">
-                        <label htmlFor="email" className="form-label">Email Address</label>
-                        <div className="input-wrapper">
-                            <span className="input-icon">📧</span>
-                            <input
-                                type="email"
-                                id="email"
-                                name="email"
-                                value={formData.email}
-                                onChange={handleChange}
-                                placeholder="Enter your email"
-                                className="form-input"
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    <div className="form-group">
-                        <label htmlFor="mobileNo" className="form-label">Mobile Number</label>
-                        <div className="input-wrapper">
-                            <span className="input-icon">📱</span>
-                            <input
-                                type="tel"
-                                id="mobileNo"
-                                name="mobileNo"
-                                value={formData.mobileNo}
-                                onChange={handleChange}
-                                placeholder="Enter your mobile number"
-                                className="form-input"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="form-group">
-                        <label htmlFor="password" className="form-label">Password</label>
-                        <div className="input-wrapper">
-                            <span className="input-icon">🔒</span>
-                            <input
-                                type="password"
-                                id="password"
-                                name="password"
-                                value={formData.password}
-                                onChange={handleChange}
-                                placeholder="Create a password"
-                                className="form-input"
-                                required
-                            />
-                        </div>
-                        {formData.password && (
-                            <div className="password-strength">
-                                <div className="strength-bar">
-                                    <div
-                                        className="strength-fill"
-                                        style={{
-                                            width: `${passwordStrength * 20}%`,
-                                            backgroundColor: getPasswordStrengthColor()
-                                        }}
-                                    ></div>
+                                    <div className="form-group">
+                                        <label htmlFor="userRoleID" className="form-label">User Role</label>
+                                        <div className="input-wrapper">
+                                            <select
+                                                id="userRoleID"
+                                                name="userRoleID"
+                                                value={formData.userRoleID}
+                                                onChange={handleChange}
+                                                className="form-input no-icon"
+                                                required
+                                            >
+                                                <option value="" disabled>Select User Role</option>
+                                                {roles.map(role => (
+                                                    <option key={role.id} value={role.id}>
+                                                        {role.roleName}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
                                 </div>
-                                <span
-                                    className="strength-label"
-                                    style={{ color: getPasswordStrengthColor() }}
-                                >
-                                    {getPasswordStrengthLabel()}
-                                </span>
+
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label htmlFor="firstName" className="form-label">First Name</label>
+                                        <div className="input-wrapper">
+                                            <input
+                                                type="text"
+                                                id="firstName"
+                                                name="firstName"
+                                                value={formData.firstName}
+                                                onChange={handleChange}
+                                                placeholder="First name"
+                                                className="form-input no-icon"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label htmlFor="lastName" className="form-label">Last Name</label>
+                                        <div className="input-wrapper">
+                                            <input
+                                                type="text"
+                                                id="lastName"
+                                                name="lastName"
+                                                value={formData.lastName}
+                                                onChange={handleChange}
+                                                placeholder="Last name"
+                                                className="form-input no-icon"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                        )}
-                    </div>
 
-                    <div className="form-group">
-                        <label htmlFor="confirmPassword" className="form-label">Confirm Password</label>
-                        <div className="input-wrapper">
-                            <span className="input-icon">🔒</span>
-                            <input
-                                type="password"
-                                id="confirmPassword"
-                                name="confirmPassword"
-                                value={formData.confirmPassword}
-                                onChange={handleChange}
-                                placeholder="Confirm your password"
-                                className="form-input"
-                                required
-                            />
+                            {/* Vertical Separator */}
+                            <div className="signup-vertical-separator"></div>
+
+                            {/* Right Column */}
+                            <div className="signup-column right">
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label htmlFor="email" className="form-label">Email</label>
+                                        <div className="input-wrapper">
+                                            <input
+                                                type="email"
+                                                id="email"
+                                                name="email"
+                                                value={formData.email}
+                                                onChange={handleChange}
+                                                placeholder="Email address"
+                                                className="form-input no-icon"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label htmlFor="mobileNo" className="form-label">Mobile</label>
+                                        <div className="input-wrapper">
+                                            <input
+                                                type="tel"
+                                                id="mobileNo"
+                                                name="mobileNo"
+                                                value={formData.mobileNo}
+                                                onChange={handleChange}
+                                                placeholder="Mobile number"
+                                                className="form-input no-icon"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label htmlFor="password" className="form-label">Password</label>
+                                        <div className="input-wrapper">
+                                            <input
+                                                type="password"
+                                                id="password"
+                                                name="password"
+                                                value={formData.password}
+                                                onChange={handleChange}
+                                                placeholder="Create password"
+                                                className="form-input no-icon"
+                                                required
+                                            />
+                                        </div>
+                                        {formData.password && (
+                                            <div className="password-strength">
+                                                <div className="strength-bar">
+                                                    <div
+                                                        className="strength-fill"
+                                                        style={{
+                                                            width: `${passwordStrength * 20}%`,
+                                                            backgroundColor: getPasswordStrengthColor()
+                                                        }}
+                                                    ></div>
+                                                </div>
+                                                <span className="strength-label" style={{ color: getPasswordStrengthColor() }}>
+                                                    {getPasswordStrengthLabel()}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label htmlFor="confirmPassword" className="form-label">Confirm Password</label>
+                                        <div className="input-wrapper">
+                                            <input
+                                                type="password"
+                                                id="confirmPassword"
+                                                name="confirmPassword"
+                                                value={formData.confirmPassword}
+                                                onChange={handleChange}
+                                                placeholder="Confirm password"
+                                                className="form-input no-icon"
+                                                required
+                                            />
+                                        </div>
+                                        {formData.confirmPassword && formData.password !== formData.confirmPassword && (
+                                            <span className="field-error">Passwords do not match</span>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        {formData.confirmPassword && formData.password !== formData.confirmPassword && (
-                            <span className="field-error">Passwords do not match</span>
-                        )}
-                    </div>
 
-                    <label className="terms-checkbox">
-                        <input type="checkbox" required />
-                        <span>I agree to the <a href="#terms">Terms of Service</a> and <a href="#privacy">Privacy Policy</a></span>
-                    </label>
+                        {/* Footer row */}
+                        <div className="signup-footer-row">
+                            <button
+                                type="submit"
+                                className={`auth-button`} // Removed loading class/spinner here
+                                disabled={loading}
+                            >
+                                Create Account
+                            </button>
 
-                    <button
-                        type="submit"
-                        className={`auth-button ${loading ? 'loading' : ''}`}
-                        disabled={loading}
-                    >
-                        {loading ? (
-                            <span className="loading-spinner"></span>
-                        ) : (
-                            'Create Account'
-                        )}
-                    </button>
-                </form>
-
-                <div className="auth-footer">
-                    <p>Already have an account? <Link to="/login" className="auth-link">Sign In</Link></p>
+                            <p className="signup-login-link">
+                                Already have an account? <Link to="/login" className="auth-link">Sign In</Link>
+                            </p>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>

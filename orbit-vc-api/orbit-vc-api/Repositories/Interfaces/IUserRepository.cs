@@ -6,6 +6,7 @@ namespace orbit_vc_api.Repositories.Interfaces
     {
         Task<User?> GetByIdAsync(Guid id);
         Task<User?> GetByEmailAsync(string email);
+        Task<User?> GetByUserIdAsync(string userId);
         Task<IEnumerable<User>> GetAllAsync();
         Task<Guid> CreateAsync(User user);
         Task<bool> UpdateAsync(User user);
@@ -13,5 +14,6 @@ namespace orbit_vc_api.Repositories.Interfaces
         Task<bool> UpdateLastLoginAsync(Guid userId);
         Task<bool> UpdatePasswordAsync(Guid userId, string newPassword);
         Task<bool> EmailExistsAsync(string email);
+        Task<bool> UserIdExistsAsync(string userId);
     }
 }

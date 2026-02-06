@@ -9,6 +9,7 @@ builder.Services.AddControllers();
 // Register repositories
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserRoleRepository, UserRoleRepository>();
+builder.Services.AddSingleton<orbit_vc_api.Services.ILoggerService, orbit_vc_api.Services.LoggerService>();
 
 // Configure CORS
 builder.Services.AddCors(options =>

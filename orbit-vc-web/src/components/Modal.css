@@ -1,0 +1,155 @@
+/* Modal Overlay */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(5, 10, 20, 0.85);
+    /* Deep dark overlay */
+    backdrop-filter: blur(8px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+/* Modal Container using Glassmorphism */
+.modal-container {
+    width: 90%;
+    max-width: 400px;
+    background: rgba(15, 20, 35, 0.95);
+    border: 1px solid rgba(0, 255, 255, 0.2);
+    border-radius: 16px;
+    padding: 30px;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+    transform: scale(0.9);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.modal-container.animate-in {
+    transform: scale(1);
+    opacity: 1;
+}
+
+/* Header & Icon */
+.modal-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.modal-icon-badge {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 30px;
+    font-weight: bold;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+}
+
+.modal-title {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: 0.5px;
+}
+
+/* Content */
+.modal-content {
+    margin-bottom: 25px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 1rem;
+    line-height: 1.5;
+}
+
+/* Button */
+.modal-footer {
+    width: 100%;
+}
+
+.modal-button {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #000;
+}
+
+.modal-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 255, 255, 0.2);
+}
+
+/* Variants */
+/* Success */
+.modal-container.success {
+    border-color: rgba(0, 255, 255, 0.4);
+    box-shadow: 0 0 50px rgba(0, 255, 255, 0.15);
+}
+
+.modal-container.success .modal-icon-badge {
+    background: rgba(0, 255, 255, 0.1);
+    border-color: rgba(0, 255, 255, 0.5);
+    color: #00ffff;
+    text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+}
+
+.modal-container.success .modal-button {
+    background: linear-gradient(90deg, #00ffff 0%, #00d4ff 100%);
+}
+
+/* Error */
+.modal-container.error {
+    border-color: rgba(255, 50, 50, 0.4);
+    box-shadow: 0 0 50px rgba(255, 50, 50, 0.15);
+}
+
+.modal-container.error .modal-icon-badge {
+    background: rgba(255, 50, 50, 0.1);
+    border-color: rgba(255, 50, 50, 0.5);
+    color: #ff3232;
+    text-shadow: 0 0 10px rgba(255, 50, 50, 0.5);
+}
+
+.modal-container.error .modal-button {
+    background: linear-gradient(90deg, #ff3232 0%, #ff0000 100%);
+    color: white;
+}
+
+/* Info/Warning */
+.modal-container.info {
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.modal-container.info .modal-button {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.modal-container.info .modal-button:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
