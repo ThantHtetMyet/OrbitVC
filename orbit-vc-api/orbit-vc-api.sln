@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36623.8 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "orbit-vc-api", "orbit-vc-api\orbit-vc-api.csproj", "{879F8DE0-7360-47C2-8816-AAB883739724}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{879F8DE0-7360-47C2-8816-AAB883739724}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{879F8DE0-7360-47C2-8816-AAB883739724}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{879F8DE0-7360-47C2-8816-AAB883739724}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{879F8DE0-7360-47C2-8816-AAB883739724}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {2D6F5300-9891-4812-9875-A2B3FE15EF0B}
+	EndGlobalSection
+EndGlobal
