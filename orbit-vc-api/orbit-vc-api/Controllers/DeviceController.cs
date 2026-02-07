@@ -4,6 +4,8 @@ using orbit_vc_api.Models.DTOs;
 using orbit_vc_api.Repositories.Interfaces;
 using orbit_vc_api.Services;
 using orbit_vc_api.Constants;
+using System.Diagnostics;
+using System.Text.Json;
 
 namespace orbit_vc_api.Controllers
 {
@@ -138,6 +140,25 @@ namespace orbit_vc_api.Controllers
                 {
                     _logger.LogActivity("Device Creation Failed", $"Device creation failed - {validationError}");
                     return BadRequest(new { message = validationError });
+                }
+
+                // Ping check for IP addresses
+                if (request.IPAddresses != null && request.IPAddresses.Any(ip => !string.IsNullOrEmpty(ip.IPAddress)))
+                {
+                    var ips = request.IPAddresses
+                        .Where(ip => !string.IsNullOrEmpty(ip.IPAddress))
+                        .Select(ip => ip.IPAddress)
+                        .ToList();
+
+                    _logger.LogActivity("User created new Device", $"Initiating ping check for {ips.Count} IP addresses");
+
+                    var (success, message) = await RunPingCheckAsync(ips);
+                    if (!success)
+                    {
+                        _logger.LogActivity("Device Creation Failed", $"Ping check failed: {message}");
+                        return BadRequest(new { message = "ICMP failed: None of the provided IP addresses are reachable." }); // Specific message requested
+                    }
+                    _logger.LogActivity("User created new Device", $"Ping check successful: {message}");
                 }
 
                 // Create device
@@ -481,5 +502,74 @@ namespace orbit_vc_api.Controllers
         }
 
         #endregion
+        private async Task<(bool Success, string Message)> RunPingCheckAsync(List<string> ips)
+        {
+            try
+            {
+                var scriptPath = Path.Combine(Directory.GetCurrentDirectory(), "PythonScripts", "01_Ping_DeviceIPAddress", "ping_check.py");
+                
+                if (!System.IO.File.Exists(scriptPath))
+                {
+                    _logger.LogError("System", "Ping Check Error", $"Python script not found at: {scriptPath}", null);
+                    // If script is missing, should we fail or proceed? 
+                    // User requirement is strict on ping check. So fail securely.
+                    return (false, "Ping script configuration error.");
+                }
+
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = "python", // Assumes python is in PATH
+                    Arguments = $"\"{scriptPath}\" {string.Join(" ", ips)}",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var process = new Process { StartInfo = startInfo };
+                process.Start();
+
+                var output = await process.StandardOutput.ReadToEndAsync();
+                var error = await process.StandardError.ReadToEndAsync();
+                
+                await process.WaitForExitAsync();
+
+                if (process.ExitCode == 0)
+                {
+                    // Try to parse JSON output purely for better logging/message
+                    try 
+                    {
+                        using var doc = JsonDocument.Parse(output);
+                        if (doc.RootElement.TryGetProperty("message", out var msgElement))
+                        {
+                            return (true, msgElement.GetString() ?? "Ping successful");
+                        }
+                    }
+                    catch { /* ignore json parse error on success */ }
+                    return (true, "Ping successful");
+                }
+                else
+                {
+                    // Try to parse JSON error message
+                    try 
+                    {
+                        using var doc = JsonDocument.Parse(output);
+                        if (doc.RootElement.TryGetProperty("message", out var msgElement))
+                        {
+                            return (false, msgElement.GetString() ?? "Ping failed");
+                        }
+                    }
+                    catch { /* ignore json parse error */ }
+                    
+                    return (false, $"Ping failed (Exit Code: {process.ExitCode}). Error: {error}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("System", "Ping Check Exception", "Error running ping script", ex);
+                return (false, "Internal error during ping check.");
+            }
+        }
+
     }
 }
