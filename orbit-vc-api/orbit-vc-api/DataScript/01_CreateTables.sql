@@ -133,3 +133,162 @@ BEGIN
 END
 GO
 
+-- =============================================
+-- DEVICE LOOKUP TABLES
+-- =============================================
+
+/****** Object:  Table [dbo].[OSTypes] ******/
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[OSTypes]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[OSTypes](
+        [ID] [uniqueidentifier] NOT NULL,
+        [Name] [nvarchar](100) NOT NULL,
+        [IsDeleted] [bit] NOT NULL DEFAULT 0,
+        CONSTRAINT [PK_OSTypes] PRIMARY KEY CLUSTERED ([ID] ASC)
+    )
+END
+GO
+
+/****** Object:  Table [dbo].[DeviceTypes] ******/
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[DeviceTypes]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[DeviceTypes](
+        [ID] [uniqueidentifier] NOT NULL,
+        [Name] [nvarchar](100) NOT NULL,
+        [IsDeleted] [bit] NOT NULL DEFAULT 0,
+        CONSTRAINT [PK_DeviceTypes] PRIMARY KEY CLUSTERED ([ID] ASC)
+    )
+END
+GO
+
+/****** Object:  Table [dbo].[ConnectionTypes] ******/
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[ConnectionTypes]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[ConnectionTypes](
+        [ID] [uniqueidentifier] NOT NULL,
+        [Name] [nvarchar](100) NOT NULL,
+        [IsDeleted] [bit] NOT NULL DEFAULT 0,
+        CONSTRAINT [PK_ConnectionTypes] PRIMARY KEY CLUSTERED ([ID] ASC)
+    )
+END
+GO
+
+/****** Object:  Table [dbo].[IPAddressTypes] ******/
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[IPAddressTypes]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[IPAddressTypes](
+        [ID] [uniqueidentifier] NOT NULL,
+        [Name] [nvarchar](100) NOT NULL,
+        [IsDeleted] [bit] NOT NULL DEFAULT 0,
+        CONSTRAINT [PK_IPAddressTypes] PRIMARY KEY CLUSTERED ([ID] ASC)
+    )
+END
+GO
+
+/****** Object:  Table [dbo].[ConnectionStatusTypes] ******/
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[ConnectionStatusTypes]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[ConnectionStatusTypes](
+        [ID] [uniqueidentifier] NOT NULL,
+        [Name] [nvarchar](100) NOT NULL,
+        [IsDeleted] [bit] NOT NULL DEFAULT 0,
+        CONSTRAINT [PK_ConnectionStatusTypes] PRIMARY KEY CLUSTERED ([ID] ASC)
+    )
+END
+GO
+
+-- =============================================
+-- DEVICE MAIN TABLES
+-- =============================================
+
+/****** Object:  Table [dbo].[Devices] ******/
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Devices]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[Devices](
+        [ID] [uniqueidentifier] NOT NULL,
+        [ConnectionTypeID] [uniqueidentifier] NULL,
+        [DeviceTypeID] [uniqueidentifier] NULL,
+        [Name] [nvarchar](100) NOT NULL,
+        [HostName] [nvarchar](200) NULL,
+        [OSTypeID] [uniqueidentifier] NULL,
+        [Remark] [nvarchar](200) NULL,
+        [IsDeleted] [bit] NOT NULL DEFAULT 0,
+        [CreatedDate] [datetime] NOT NULL DEFAULT GETDATE(),
+        [UpdatedDate] [datetime] NULL,
+        [CreatedBy] [uniqueidentifier] NULL,
+        [UpdatedBy] [uniqueidentifier] NULL,
+        CONSTRAINT [PK_Devices] PRIMARY KEY CLUSTERED ([ID] ASC)
+    )
+
+    ALTER TABLE [dbo].[Devices] WITH CHECK ADD CONSTRAINT [FK_Devices_ConnectionTypes] 
+        FOREIGN KEY([ConnectionTypeID]) REFERENCES [dbo].[ConnectionTypes] ([ID])
+    
+    ALTER TABLE [dbo].[Devices] WITH CHECK ADD CONSTRAINT [FK_Devices_DeviceTypes] 
+        FOREIGN KEY([DeviceTypeID]) REFERENCES [dbo].[DeviceTypes] ([ID])
+    
+    ALTER TABLE [dbo].[Devices] WITH CHECK ADD CONSTRAINT [FK_Devices_OSTypes] 
+        FOREIGN KEY([OSTypeID]) REFERENCES [dbo].[OSTypes] ([ID])
+END
+GO
+
+/****** Object:  Table [dbo].[DeviceIPAddresses] ******/
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[DeviceIPAddresses]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[DeviceIPAddresses](
+        [ID] [uniqueidentifier] NOT NULL,
+        [DeviceID] [uniqueidentifier] NOT NULL,
+        [IPAddressTypeID] [uniqueidentifier] NULL,
+        [IPAddress] [nvarchar](100) NOT NULL,
+        [Description] [nvarchar](100) NULL,
+        [IsDeleted] [bit] NOT NULL DEFAULT 0,
+        CONSTRAINT [PK_DeviceIPAddresses] PRIMARY KEY CLUSTERED ([ID] ASC)
+    )
+
+    ALTER TABLE [dbo].[DeviceIPAddresses] WITH CHECK ADD CONSTRAINT [FK_DeviceIPAddresses_Devices] 
+        FOREIGN KEY([DeviceID]) REFERENCES [dbo].[Devices] ([ID])
+    
+    ALTER TABLE [dbo].[DeviceIPAddresses] WITH CHECK ADD CONSTRAINT [FK_DeviceIPAddresses_IPAddressTypes] 
+        FOREIGN KEY([IPAddressTypeID]) REFERENCES [dbo].[IPAddressTypes] ([ID])
+END
+GO
+
+/****** Object:  Table [dbo].[DeviceInterfaces] ******/
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[DeviceInterfaces]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[DeviceInterfaces](
+        [ID] [uniqueidentifier] NOT NULL,
+        [DeviceID] [uniqueidentifier] NOT NULL,
+        [Name] [nvarchar](100) NOT NULL,
+        [MACAddress] [nvarchar](100) NULL,
+        [IPAddress] [nvarchar](20) NULL,
+        [SubnetMask] [nvarchar](20) NULL,
+        [SpeedMbps] [nvarchar](20) NULL,
+        [IsEnabled] [bit] NOT NULL DEFAULT 1,
+        [IsDeleted] [bit] NOT NULL DEFAULT 0,
+        CONSTRAINT [PK_DeviceInterfaces] PRIMARY KEY CLUSTERED ([ID] ASC)
+    )
+
+    ALTER TABLE [dbo].[DeviceInterfaces] WITH CHECK ADD CONSTRAINT [FK_DeviceInterfaces_Devices] 
+        FOREIGN KEY([DeviceID]) REFERENCES [dbo].[Devices] ([ID])
+END
+GO
+
+/****** Object:  Table [dbo].[DeviceIPAddressConnectionStatus] ******/
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[DeviceIPAddressConnectionStatus]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[DeviceIPAddressConnectionStatus](
+        [ID] [uniqueidentifier] NOT NULL,
+        [DeviceIPAddressID] [uniqueidentifier] NOT NULL,
+        [ConnectionStatusTypeID] [uniqueidentifier] NULL,
+        [IsDeleted] [bit] NOT NULL DEFAULT 0,
+        [LastCheckedDate] [datetime] NULL,
+        CONSTRAINT [PK_DeviceIPAddressConnectionStatus] PRIMARY KEY CLUSTERED ([ID] ASC)
+    )
+
+    ALTER TABLE [dbo].[DeviceIPAddressConnectionStatus] WITH CHECK ADD CONSTRAINT [FK_DeviceIPAddressConnectionStatus_DeviceIPAddresses] 
+        FOREIGN KEY([DeviceIPAddressID]) REFERENCES [dbo].[DeviceIPAddresses] ([ID])
+    
+    ALTER TABLE [dbo].[DeviceIPAddressConnectionStatus] WITH CHECK ADD CONSTRAINT [FK_DeviceIPAddressConnectionStatus_ConnectionStatusTypes] 
+        FOREIGN KEY([ConnectionStatusTypeID]) REFERENCES [dbo].[ConnectionStatusTypes] ([ID])
+END
+GO

@@ -198,6 +198,88 @@ class ApiService {
         const user = localStorage.getItem('user');
         return user ? JSON.parse(user) : null;
     }
+
+    // ============================================
+    // Device API Methods
+    // ============================================
+
+    /**
+     * Get all devices
+     */
+    async getDevices() {
+        return await this.get('/Device');
+    }
+
+    /**
+     * Get devices with pagination
+     */
+    async getDevicesPaged(page = 1, pageSize = 10, search = '') {
+        let endpoint = `/Device/paged?page=${page}&pageSize=${pageSize}`;
+        if (search) {
+            endpoint += `&search=${encodeURIComponent(search)}`;
+        }
+        return await this.get(endpoint);
+    }
+
+    /**
+     * Get device by ID
+     */
+    async getDeviceById(id) {
+        return await this.get(`/Device/${id}`);
+    }
+
+    /**
+     * Create a new device
+     */
+    async createDevice(deviceData) {
+        return await this.post('/Device', deviceData);
+    }
+
+    /**
+     * Update an existing device
+     */
+    async updateDevice(id, deviceData) {
+        return await this.put(`/Device/${id}`, deviceData);
+    }
+
+    /**
+     * Delete a device
+     */
+    async deleteDevice(id) {
+        return await this.delete(`/Device/${id}`);
+    }
+
+    // ============================================
+    // Device Lookup API Methods
+    // ============================================
+
+    /**
+     * Get all OS types
+     */
+    async getOSTypes() {
+        return await this.get('/Device/lookup/os-types');
+    }
+
+    /**
+     * Get all device types
+     */
+    async getDeviceTypes() {
+        return await this.get('/Device/lookup/device-types');
+    }
+
+    /**
+     * Get all connection types
+     */
+    async getConnectionTypes() {
+        return await this.get('/Device/lookup/connection-types');
+    }
+
+    /**
+     * Get all IP address types
+     */
+    async getIPAddressTypes() {
+        return await this.get('/Device/lookup/ip-address-types');
+    }
 }
 
 const apiService = new ApiService();

@@ -23,6 +23,28 @@ const SignUp = () => {
     const [animateIn, setAnimateIn] = useState(false);
     const [roles, setRoles] = useState([]);
 
+    // Computed validation state
+    const isFormValid = () => {
+        const { userId, firstName, lastName, email, password, confirmPassword, userRoleID } = formData;
+
+        // Check required fields
+        if (!userId || !firstName || !lastName || !email || !password || !confirmPassword || !userRoleID) {
+            return false;
+        }
+
+        // Check password match
+        if (password !== confirmPassword) {
+            return false;
+        }
+
+        // Check password length
+        if (password.length < 6) {
+            return false;
+        }
+
+        return true;
+    };
+
     // Modal State
     const [modalConfig, setModalConfig] = useState({
         isOpen: false,
@@ -328,6 +350,9 @@ const SignUp = () => {
                                                 </span>
                                             </div>
                                         )}
+                                        {formData.password && formData.password.length < 6 && (
+                                            <span className="field-error">Password must be at least 6 characters</span>
+                                        )}
                                     </div>
 
                                     <div className="form-group">
@@ -356,8 +381,8 @@ const SignUp = () => {
                         <div className="signup-footer-row">
                             <button
                                 type="submit"
-                                className={`auth-button`} // Removed loading class/spinner here
-                                disabled={loading}
+                                className={`auth-button${!isFormValid() ? ' disabled' : ''}`}
+                                disabled={loading || !isFormValid()}
                             >
                                 Create Account
                             </button>

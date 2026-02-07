@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import apiService from '../../services/api-service';
 import CursorAnimation from '../../components/CursorAnimation';
+import Modal from '../../components/Modal';
+import LoadingSpinner from '../../components/LoadingSpinner';
 import './User.css';
 
 const Login = () => {
@@ -10,9 +12,17 @@ const Login = () => {
         userId: '',
         password: '',
     });
-    const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [animateIn, setAnimateIn] = useState(false);
+
+    // Modal State
+    const [modalConfig, setModalConfig] = useState({
+        isOpen: false,
+        title: '',
+        message: '',
+        type: 'info', // success, error, info
+        onConfirm: null
+    });
 
     // Trigger animation on page load
     useEffect(() => {
@@ -25,24 +35,44 @@ const Login = () => {
             ...prev,
             [name]: value
         }));
-        setError('');
+    };
+
+    const showModal = (title, message, type = 'info', onConfirm = null) => {
+        setModalConfig({
+            isOpen: true,
+            title,
+            message,
+            type,
+            onConfirm
+        });
+    };
+
+    const closeModal = () => {
+        setModalConfig(prev => ({ ...prev, isOpen: false }));
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        setError('');
+
+        // Validation
+        if (!formData.userId || !formData.password) {
+            setLoading(false);
+            showModal('Validation Error', 'Please enter both UserID and Password.', 'error');
+            return;
+        }
 
         try {
             const response = await apiService.login(formData.userId, formData.password);
 
             if (response.success) {
-                navigate('/dashboard');
+                navigate('/devices');
             } else {
-                setError(response.message || 'Login failed');
+                // Show specific error message from API in modal
+                showModal('Login Failed', response.message || 'Login failed. Please try again.', 'error');
             }
         } catch (err) {
-            setError(err.message || 'An error occurred during login');
+            showModal('Error', err.message || 'An error occurred during login. Please try again.', 'error');
         } finally {
             setLoading(false);
         }
@@ -51,6 +81,19 @@ const Login = () => {
     return (
         <div className="auth-container">
             <CursorAnimation />
+
+            {/* Loading Overlay */}
+            {loading && <LoadingSpinner fullScreen={true} size="small" />}
+
+            {/* Modal */}
+            <Modal
+                isOpen={modalConfig.isOpen}
+                onClose={closeModal}
+                title={modalConfig.title}
+                message={modalConfig.message}
+                type={modalConfig.type}
+                onConfirm={modalConfig.onConfirm}
+            />
 
             {/* Title Container */}
             <div className={`title-container ${animateIn ? 'animate-in' : ''}`}>
@@ -63,13 +106,6 @@ const Login = () => {
                 {/* Right Panel - Form */}
                 <div className="login-form-panel">
                     <form onSubmit={handleSubmit} className="auth-form login-grid-form">
-
-                        {error && (
-                            <div className="auth-error">
-                                <span className="error-icon">⚠️</span>
-                                {error}
-                            </div>
-                        )}
 
                         <div className="login-fields-grid">
                             <div className="form-group">

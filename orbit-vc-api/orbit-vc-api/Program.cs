@@ -1,5 +1,9 @@
 using orbit_vc_api.Repositories;
 using orbit_vc_api.Repositories.Interfaces;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using orbit_vc_api.Constants;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,7 +13,25 @@ builder.Services.AddControllers();
 // Register repositories
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserRoleRepository, UserRoleRepository>();
+builder.Services.AddScoped<IDeviceRepository, DeviceRepository>();
 builder.Services.AddSingleton<orbit_vc_api.Services.ILoggerService, orbit_vc_api.Services.LoggerService>();
+builder.Services.AddHttpContextAccessor(); // Required for accessing User identity in logs
+
+// Configure JWT Authentication
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = AppConstants.Jwt.Issuer,
+            ValidAudience = AppConstants.Jwt.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(AppConstants.Jwt.Secret))
+        };
+    });
 
 // Configure CORS
 builder.Services.AddCors(options =>
@@ -42,6 +64,7 @@ app.UseHttpsRedirection();
 // Use CORS
 app.UseCors("AllowReactApp");
 
+app.UseAuthentication(); // Must be before Authorization
 app.UseAuthorization();
 
 app.MapControllers();
