@@ -14,6 +14,7 @@ builder.Services.AddControllers();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserRoleRepository, UserRoleRepository>();
 builder.Services.AddScoped<IDeviceRepository, DeviceRepository>();
+builder.Services.AddScoped<IFileControlRepository, FileControlRepository>();
 builder.Services.AddSingleton<orbit_vc_api.Services.ILoggerService, orbit_vc_api.Services.LoggerService>();
 builder.Services.AddHttpContextAccessor(); // Required for accessing User identity in logs
 

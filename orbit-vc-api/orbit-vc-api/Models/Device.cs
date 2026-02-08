@@ -20,6 +20,8 @@ namespace orbit_vc_api.Models
         public DeviceType? DeviceType { get; set; }
         public ConnectionType? ConnectionType { get; set; }
         public List<DeviceIPAddress>? IPAddresses { get; set; }
-        public List<DeviceInterface>? Interfaces { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+        public string? Status { get; set; }
     }
 }

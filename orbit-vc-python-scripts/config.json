@@ -1,0 +1,25 @@
+{
+    "database": {
+        "driver": "{ODBC Driver 17 for SQL Server}",
+        "server": "WGN-009-530\\SQLEXPRESS2022",
+        "database": "OrbitVC",
+        "uid": "opmadmin",
+        "pwd": "Willowglen@12345",
+        "trust_server_certificate": "yes"
+    },
+    "logging": {
+        "directory": "./Logs",
+        "level": "INFO"
+    },
+    "scheduler": {
+        "check_interval_seconds": 10
+    },
+    "modules": [
+        {
+            "name": "PingCheck",
+            "enabled": true,
+            "module_path": "01_Ping_DeviceIPAddress.ping_check",
+            "interval_minutes": 1
+        }
+    ]
+}

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Hosting;
 using orbit_vc_api.Models;
 using orbit_vc_api.Models.DTOs;
 using orbit_vc_api.Repositories.Interfaces;
@@ -14,12 +15,16 @@ namespace orbit_vc_api.Controllers
     public class DeviceController : ControllerBase
     {
         private readonly IDeviceRepository _deviceRepository;
+        private readonly IFileControlRepository _fileControlRepository;
         private readonly ILoggerService _logger;
+        private readonly IWebHostEnvironment _env;
 
-        public DeviceController(IDeviceRepository deviceRepository, ILoggerService logger)
+        public DeviceController(IDeviceRepository deviceRepository, IFileControlRepository fileControlRepository, ILoggerService logger, IWebHostEnvironment env)
         {
             _deviceRepository = deviceRepository;
+            _fileControlRepository = fileControlRepository;
             _logger = logger;
+            _env = env;
         }
 
         /// <summary>
@@ -32,7 +37,7 @@ namespace orbit_vc_api.Controllers
             {
                 
                 var devices = await _deviceRepository.GetAllAsync();
-                var deviceDtos = devices.Select(MapToDto).ToList();
+                var deviceDtos = devices.Select(d => MapToDto(d)).ToList();
                 
                 _logger.LogActivity("User loaded Device List", $"Retrieved {deviceDtos.Count} devices from database");
                 
@@ -59,7 +64,7 @@ namespace orbit_vc_api.Controllers
                 var (devices, totalCount) = await _deviceRepository.GetPagedAsync(page, pageSize, search);
                 var response = new DeviceListResponse
                 {
-                    Devices = devices.Select(MapToDto).ToList(),
+                    Devices = devices.Select(d => MapToDto(d)).ToList(),
                     TotalCount = totalCount,
                     Page = page,
                     PageSize = pageSize
@@ -94,17 +99,55 @@ namespace orbit_vc_api.Controllers
                     _logger.LogActivity("User viewed Device details", $"Device not found - Device ID: {id}");
                     return NotFound(new { message = "Device not found" });
                 }
+
+                // Get IP address statuses
+                var ipStatuses = await _deviceRepository.GetIPAddressStatusesByDeviceIdAsync(id);
                 
                 _logger.LogActivity("User viewed Device details", 
                     $"Device details retrieved - Name: {device.Name}, Type: {device.DeviceType?.Name ?? "N/A"}, OS: {device.OSType?.Name ?? "N/A"}");
                 
-                return Ok(MapToDto(device));
+                return Ok(MapToDto(device, ipStatuses));
             }
             catch (Exception ex)
             {
                 _logger.LogError("System", "DEVICE_VIEW_ERROR", 
                     $"Failed to fetch device details - Device ID: {id}", ex);
                 return StatusCode(500, new { message = "An error occurred while fetching the device" });
+            }
+        }
+
+        /// <summary>
+        /// Get monitored files for a device
+        /// </summary>
+        [HttpGet("{id}/monitored-files")]
+        public async Task<ActionResult<IEnumerable<DeviceMonitoredFileDto>>> GetMonitoredFiles(Guid id)
+        {
+            try
+            {
+                var directories = await _fileControlRepository.GetMonitoredDirectoriesByDeviceIdAsync(id);
+                var result = new List<DeviceMonitoredFileDto>();
+
+                foreach (var dir in directories)
+                {
+                    var files = await _fileControlRepository.GetMonitoredFilesAsync(dir.ID);
+                    result.AddRange(files.Select(f => new DeviceMonitoredFileDto
+                    {
+                        ID = f.ID,
+                        DirectoryPath = dir.DirectoryPath,
+                        FilePath = f.FilePath,
+                        FileName = f.FileName,
+                        FileSize = f.FileSize,
+                        LastScan = f.LastScan
+                    }));
+                }
+
+                _logger.LogActivity("User viewed Device Monitored Files", $"Retrieved {result.Count} monitored files for device {id}");
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("System", "DEVICE_FILES_ERROR", $"Failed to fetch monitored files for device {id}", ex);
+                return StatusCode(500, new { message = "An error occurred while fetching monitored files" });
             }
         }
 
@@ -462,7 +505,7 @@ namespace orbit_vc_api.Controllers
             return null;
         }
 
-        private static DeviceDto MapToDto(Device device)
+        private static DeviceDto MapToDto(Device device, Dictionary<Guid, string>? ipStatuses = null)
         {
             return new DeviceDto
             {
@@ -476,6 +519,7 @@ namespace orbit_vc_api.Controllers
                 DeviceTypeName = device.DeviceType?.Name,
                 OSTypeID = device.OSTypeID,
                 OSTypeName = device.OSType?.Name,
+                Status = device.Status,
                 CreatedDate = device.CreatedDate,
                 UpdatedDate = device.UpdatedDate,
                 IPAddresses = device.IPAddresses?.Select(ip => new DeviceIPAddressDto
@@ -485,18 +529,8 @@ namespace orbit_vc_api.Controllers
                     IPAddressTypeID = ip.IPAddressTypeID,
                     IPAddressTypeName = ip.IPAddressType?.Name,
                     IPAddress = ip.IPAddress,
-                    Description = ip.Description
-                }).ToList(),
-                Interfaces = device.Interfaces?.Select(iface => new DeviceInterfaceDto
-                {
-                    ID = iface.ID,
-                    DeviceID = iface.DeviceID,
-                    Name = iface.Name,
-                    MACAddress = iface.MACAddress,
-                    IPAddress = iface.IPAddress,
-                    SubnetMask = iface.SubnetMask,
-                    SpeedMbps = iface.SpeedMbps,
-                    IsEnabled = iface.IsEnabled
+                    Description = ip.Description,
+                    Status = ipStatuses != null && ipStatuses.TryGetValue(ip.ID, out var status) ? status : null
                 }).ToList()
             };
         }
@@ -506,7 +540,7 @@ namespace orbit_vc_api.Controllers
         {
             try
             {
-                var scriptPath = Path.Combine(Directory.GetCurrentDirectory(), "PythonScripts", "01_Ping_DeviceIPAddress", "ping_check.py");
+                var scriptPath = Path.Combine(_env.ContentRootPath, "PythonScripts", "01_Ping_DeviceIPAddress", "ping_check.py");
                 
                 if (!System.IO.File.Exists(scriptPath))
                 {

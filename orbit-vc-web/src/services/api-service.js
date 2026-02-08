@@ -229,6 +229,13 @@ class ApiService {
     }
 
     /**
+     * Get monitored files for a device
+     */
+    async getDeviceMonitoredFiles(id) {
+        return await this.get(`/Device/${id}/monitored-files`);
+    }
+
+    /**
      * Create a new device
      */
     async createDevice(deviceData) {

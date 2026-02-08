@@ -12,10 +12,10 @@ namespace orbit_vc_api.Models.DTOs
         public string? DeviceTypeName { get; set; }
         public Guid? OSTypeID { get; set; }
         public string? OSTypeName { get; set; }
+        public string? Status { get; set; }
         public DateTime CreatedDate { get; set; }
         public DateTime? UpdatedDate { get; set; }
         public List<DeviceIPAddressDto>? IPAddresses { get; set; }
-        public List<DeviceInterfaceDto>? Interfaces { get; set; }
     }
 
     public class DeviceIPAddressDto
@@ -26,18 +26,7 @@ namespace orbit_vc_api.Models.DTOs
         public string? IPAddressTypeName { get; set; }
         public string IPAddress { get; set; } = string.Empty;
         public string? Description { get; set; }
-    }
-
-    public class DeviceInterfaceDto
-    {
-        public Guid ID { get; set; }
-        public Guid DeviceID { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string? MACAddress { get; set; }
-        public string? IPAddress { get; set; }
-        public string? SubnetMask { get; set; }
-        public string? SpeedMbps { get; set; }
-        public bool IsEnabled { get; set; }
+        public string? Status { get; set; }
     }
 
     public class CreateDeviceRequest
@@ -85,5 +74,15 @@ namespace orbit_vc_api.Models.DTOs
         public int TotalCount { get; set; }
         public int Page { get; set; }
         public int PageSize { get; set; }
+    }
+
+    public class DeviceMonitoredFileDto
+    {
+        public Guid ID { get; set; }
+        public string DirectoryPath { get; set; } = string.Empty;
+        public string FileName { get; set; } = string.Empty;
+        public string FilePath { get; set; } = string.Empty;
+        public string? FileSize { get; set; }
+        public DateTime? LastScan { get; set; }
     }
 }

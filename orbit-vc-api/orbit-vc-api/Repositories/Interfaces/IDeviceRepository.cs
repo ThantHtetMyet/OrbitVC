@@ -19,12 +19,7 @@ namespace orbit_vc_api.Repositories.Interfaces
         Task<bool> UpdateIPAddressAsync(DeviceIPAddress ipAddress);
         Task<bool> DeleteIPAddressAsync(Guid id);
         Task<bool> DeleteIPAddressesByDeviceIdAsync(Guid deviceId);
-
-        // Device Interfaces
-        Task<IEnumerable<DeviceInterface>> GetInterfacesByDeviceIdAsync(Guid deviceId);
-        Task<Guid> CreateInterfaceAsync(DeviceInterface deviceInterface);
-        Task<bool> UpdateInterfaceAsync(DeviceInterface deviceInterface);
-        Task<bool> DeleteInterfaceAsync(Guid id);
+        Task<Dictionary<Guid, string>> GetIPAddressStatusesByDeviceIdAsync(Guid deviceId);
 
         // Lookup data
         Task<IEnumerable<OSType>> GetOSTypesAsync();

@@ -24,8 +24,8 @@ const DeviceList = () => {
         onConfirm: null
     });
 
-    const fetchDevices = useCallback(async () => {
-        setLoading(true);
+    const fetchDevices = useCallback(async (silent = false) => {
+        if (!silent) setLoading(true);
         try {
             const response = await apiService.getDevicesPaged(currentPage, pageSize, searchTerm);
             setDevices(response.devices || []);
@@ -33,14 +33,21 @@ const DeviceList = () => {
             setTotalPages(Math.ceil((response.totalCount || 0) / pageSize));
         } catch (error) {
             console.error('Error fetching devices:', error);
-            showModal('Error', 'Failed to fetch devices', 'error');
+            if (!silent) showModal('Error', 'Failed to fetch devices', 'error');
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }, [currentPage, searchTerm]);
 
     useEffect(() => {
         fetchDevices();
+
+        // Poll for status updates every 5 seconds
+        const intervalId = setInterval(() => {
+            fetchDevices(true);
+        }, 5000);
+
+        return () => clearInterval(intervalId);
     }, [fetchDevices]);
 
     const showModal = (title, message, type = 'info', onConfirm = null) => {
@@ -146,9 +153,7 @@ const DeviceList = () => {
                         <tr>
                             <th>Name</th>
                             <th>HostName</th>
-                            <th>Type</th>
-                            <th>OS</th>
-                            <th>Connection</th>
+                            <th>Status</th>
                             <th>Created</th>
                             <th>Actions</th>
                         </tr>
@@ -156,32 +161,29 @@ const DeviceList = () => {
                     <tbody>
                         {devices.length === 0 ? (
                             <tr>
-                                <td colSpan="7" className="no-data">
+                                <td colSpan="5" className="no-data">
                                     {loading ? 'Loading...' : 'No devices found'}
                                 </td>
                             </tr>
                         ) : (
                             devices.map(device => (
-                                <tr key={device.id}>
+                                <tr key={device.id} onDoubleClick={() => handleView(device.id)} className="clickable-row">
                                     <td className="device-name">
                                         <span className="device-icon">💻</span>
                                         {device.name}
                                     </td>
                                     <td>{device.hostName || '-'}</td>
-                                    <td>
-                                        <span className="badge badge-type">
-                                            {device.deviceTypeName || '-'}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <span className="badge badge-os">
-                                            {device.osTypeName || '-'}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <span className="badge badge-connection">
-                                            {device.connectionTypeName || '-'}
-                                        </span>
+                                    <td className="status-cell">
+                                        <div className={`heartbeat-container ${device.status === 'UP' ? 'status-up' : 'status-down'}`}>
+                                            <svg className="heartbeat-svg" viewBox="0 0 100 40">
+                                                <path
+                                                    className="heartbeat-path"
+                                                    d={device.status === 'UP'
+                                                        ? "M0 20 L15 20 L20 10 L25 30 L30 20 L45 20 L50 10 L55 30 L60 20 L75 20"
+                                                        : "M0 20 L100 20"}
+                                                />
+                                            </svg>
+                                        </div>
                                     </td>
                                     <td>{new Date(device.createdDate).toLocaleDateString()}</td>
                                     <td className="actions-cell">

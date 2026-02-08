@@ -252,26 +252,7 @@ BEGIN
 END
 GO
 
-/****** Object:  Table [dbo].[DeviceInterfaces] ******/
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[DeviceInterfaces]') AND type in (N'U'))
-BEGIN
-    CREATE TABLE [dbo].[DeviceInterfaces](
-        [ID] [uniqueidentifier] NOT NULL,
-        [DeviceID] [uniqueidentifier] NOT NULL,
-        [Name] [nvarchar](100) NOT NULL,
-        [MACAddress] [nvarchar](100) NULL,
-        [IPAddress] [nvarchar](20) NULL,
-        [SubnetMask] [nvarchar](20) NULL,
-        [SpeedMbps] [nvarchar](20) NULL,
-        [IsEnabled] [bit] NOT NULL DEFAULT 1,
-        [IsDeleted] [bit] NOT NULL DEFAULT 0,
-        CONSTRAINT [PK_DeviceInterfaces] PRIMARY KEY CLUSTERED ([ID] ASC)
-    )
 
-    ALTER TABLE [dbo].[DeviceInterfaces] WITH CHECK ADD CONSTRAINT [FK_DeviceInterfaces_Devices] 
-        FOREIGN KEY([DeviceID]) REFERENCES [dbo].[Devices] ([ID])
-END
-GO
 
 /****** Object:  Table [dbo].[DeviceIPAddressConnectionStatus] ******/
 IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[DeviceIPAddressConnectionStatus]') AND type in (N'U'))
@@ -290,5 +271,101 @@ BEGIN
     
     ALTER TABLE [dbo].[DeviceIPAddressConnectionStatus] WITH CHECK ADD CONSTRAINT [FK_DeviceIPAddressConnectionStatus_ConnectionStatusTypes] 
         FOREIGN KEY([ConnectionStatusTypeID]) REFERENCES [dbo].[ConnectionStatusTypes] ([ID])
+END
+GO
+
+-- =============================================
+-- FILE CONTROL TABLES
+-- =============================================
+
+/****** Object:  Table [dbo].[MonitoredDirectories] ******/
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[MonitoredDirectories]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[MonitoredDirectories](
+        [ID] [uniqueidentifier] NOT NULL,
+        [DeviceID] [uniqueidentifier] NOT NULL,
+        [DirectoryPath] [nvarchar](500) NOT NULL,
+        [IsActive] [bit] NOT NULL,
+        [CreatedDate] [datetime] NOT NULL DEFAULT GETDATE(),
+        [IsDeleted] [bit] NOT NULL DEFAULT 0,
+        CONSTRAINT [PK_MonitoredDirectories] PRIMARY KEY CLUSTERED ([ID] ASC)
+    )
+
+    ALTER TABLE [dbo].[MonitoredDirectories] WITH CHECK ADD CONSTRAINT [FK_MonitoredDirectories_Devices]
+        FOREIGN KEY([DeviceID]) REFERENCES [dbo].[Devices] ([ID])
+END
+GO
+
+/****** Object:  Table [dbo].[MonitoredFiles] ******/
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[MonitoredFiles]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[MonitoredFiles](
+        [ID] [uniqueidentifier] NOT NULL,
+        [MonitoredDirectoryID] [uniqueidentifier] NOT NULL,
+        [FilePath] [nvarchar](500) NOT NULL,
+        [FileName] [nvarchar](500) NOT NULL,
+        [FileSize] [nvarchar](100) NULL,
+        [FileHash] [nvarchar](max) NULL,
+        [LastScan] [datetime] NULL,
+        [IsDeleted] [bit] NOT NULL DEFAULT 0,
+        [CreatedDate] [datetime] NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT [PK_MonitoredFiles] PRIMARY KEY CLUSTERED ([ID] ASC)
+    )
+
+    ALTER TABLE [dbo].[MonitoredFiles] WITH CHECK ADD CONSTRAINT [FK_MonitoredFiles_MonitoredDirectories]
+        FOREIGN KEY([MonitoredDirectoryID]) REFERENCES [dbo].[MonitoredDirectories] ([ID])
+END
+GO
+
+/****** Object:  Table [dbo].[FileVersions] ******/
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[FileVersions]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[FileVersions](
+        [ID] [uniqueidentifier] NOT NULL,
+        [MonitoredFileID] [uniqueidentifier] NOT NULL,
+        [VersionNo] [int] NOT NULL,
+        [ChangeType] [nvarchar](50) NOT NULL,
+        [FileSize] [nvarchar](100) NULL,
+        [FileHash] [nvarchar](max) NULL,
+        [DetectedDate] [datetime] NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT [PK_FileVersions] PRIMARY KEY CLUSTERED ([ID] ASC)
+    )
+
+    ALTER TABLE [dbo].[FileVersions] WITH CHECK ADD CONSTRAINT [FK_FileVersions_MonitoredFiles]
+        FOREIGN KEY([MonitoredFileID]) REFERENCES [dbo].[MonitoredFiles] ([ID])
+END
+GO
+
+/****** Object:  Table [dbo].[FileContents] ******/
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[FileContents]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[FileContents](
+        [ID] [uniqueidentifier] NOT NULL,
+        [FileVersionID] [uniqueidentifier] NOT NULL,
+        [FileData] [varbinary](max) NOT NULL,
+        [CreatedDate] [datetime] NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT [PK_FileContents] PRIMARY KEY CLUSTERED ([ID] ASC)
+    )
+
+    ALTER TABLE [dbo].[FileContents] WITH CHECK ADD CONSTRAINT [FK_FileContents_FileVersions]
+        FOREIGN KEY([FileVersionID]) REFERENCES [dbo].[FileVersions] ([ID])
+END
+GO
+
+/****** Object:  Table [dbo].[ScanLogs] ******/
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[ScanLogs]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[ScanLogs](
+        [ID] [uniqueidentifier] NOT NULL,
+        [DirectoryID] [uniqueidentifier] NOT NULL,
+        [ScanDate] [datetime] NOT NULL DEFAULT GETDATE(),
+        [FilesScanned] [int] NOT NULL,
+        [ChangesDetected] [int] NOT NULL,
+        [Status] [nvarchar](50) NOT NULL,
+        CONSTRAINT [PK_ScanLogs] PRIMARY KEY CLUSTERED ([ID] ASC)
+    )
+
+    ALTER TABLE [dbo].[ScanLogs] WITH CHECK ADD CONSTRAINT [FK_ScanLogs_MonitoredDirectories]
+        FOREIGN KEY([DirectoryID]) REFERENCES [dbo].[MonitoredDirectories] ([ID])
 END
 GO

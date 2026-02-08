@@ -51,7 +51,6 @@ namespace orbit_vc_api.Repositories
             if (device != null)
             {
                 device.IPAddresses = (await GetIPAddressesByDeviceIdAsync(id)).ToList();
-                device.Interfaces = (await GetInterfacesByDeviceIdAsync(id)).ToList();
             }
 
             return device;
@@ -64,24 +63,34 @@ namespace orbit_vc_api.Repositories
                 SELECT d.*, 
                        ot.ID, ot.Name,
                        dt.ID, dt.Name,
-                       ct.ID, ct.Name
+                       ct.ID, ct.Name,
+                       Status.StatusName
                 FROM Devices d
                 LEFT JOIN OSTypes ot ON d.OSTypeID = ot.ID
                 LEFT JOIN DeviceTypes dt ON d.DeviceTypeID = dt.ID
                 LEFT JOIN ConnectionTypes ct ON d.ConnectionTypeID = ct.ID
+                OUTER APPLY (
+                    SELECT TOP 1 cst.Name
+                    FROM DeviceIPAddresses dia
+                    JOIN DeviceIPAddressConnectionStatus diacs ON dia.ID = diacs.DeviceIPAddressID
+                    JOIN ConnectionStatusTypes cst ON diacs.ConnectionStatusTypeID = cst.ID
+                    WHERE dia.DeviceID = d.ID AND dia.IsDeleted = 0 AND diacs.IsDeleted = 0
+                    ORDER BY diacs.LastCheckedDate DESC
+                ) AS Status(StatusName)
                 WHERE d.IsDeleted = 0
                 ORDER BY d.Name";
 
-            var result = await connection.QueryAsync<Device, OSType, DeviceType, ConnectionType, Device>(
+            var result = await connection.QueryAsync<Device, OSType, DeviceType, ConnectionType, string?, Device>(
                 sql,
-                (device, osType, deviceType, connectionType) =>
+                (device, osType, deviceType, connectionType, status) =>
                 {
                     device.OSType = osType;
                     device.DeviceType = deviceType;
                     device.ConnectionType = connectionType;
+                    if (status != null) device.Status = status;
                     return device;
                 },
-                splitOn: "ID,ID,ID"
+                splitOn: "ID,ID,ID,StatusName"
             );
 
             return result;
@@ -105,26 +114,36 @@ namespace orbit_vc_api.Repositories
                 SELECT d.*, 
                        ot.ID, ot.Name,
                        dt.ID, dt.Name,
-                       ct.ID, ct.Name
+                       ct.ID, ct.Name,
+                       Status.StatusName
                 FROM Devices d
                 LEFT JOIN OSTypes ot ON d.OSTypeID = ot.ID
                 LEFT JOIN DeviceTypes dt ON d.DeviceTypeID = dt.ID
                 LEFT JOIN ConnectionTypes ct ON d.ConnectionTypeID = ct.ID
+                OUTER APPLY (
+                    SELECT TOP 1 cst.Name
+                    FROM DeviceIPAddresses dia
+                    JOIN DeviceIPAddressConnectionStatus diacs ON dia.ID = diacs.DeviceIPAddressID
+                    JOIN ConnectionStatusTypes cst ON diacs.ConnectionStatusTypeID = cst.ID
+                    WHERE dia.DeviceID = d.ID AND dia.IsDeleted = 0 AND diacs.IsDeleted = 0
+                    ORDER BY diacs.LastCheckedDate DESC
+                ) AS Status(StatusName)
                 {whereClause}
                 ORDER BY d.Name
                 OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
-            var result = await connection.QueryAsync<Device, OSType, DeviceType, ConnectionType, Device>(
+            var result = await connection.QueryAsync<Device, OSType, DeviceType, ConnectionType, string?, Device>(
                 sql,
-                (device, osType, deviceType, connectionType) =>
+                (device, osType, deviceType, connectionType, status) =>
                 {
                     device.OSType = osType;
                     device.DeviceType = deviceType;
                     device.ConnectionType = connectionType;
+                    if (status != null) device.Status = status;
                     return device;
                 },
                 new { Offset = offset, PageSize = pageSize, SearchTerm = $"%{searchTerm}%" },
-                splitOn: "ID,ID,ID"
+                splitOn: "ID,ID,ID,StatusName"
             );
 
             return (result, totalCount);
@@ -268,59 +287,23 @@ namespace orbit_vc_api.Repositories
             return true;
         }
 
-        #endregion
-
-        #region Device Interfaces
-
-        public async Task<IEnumerable<DeviceInterface>> GetInterfacesByDeviceIdAsync(Guid deviceId)
+        public async Task<Dictionary<Guid, string>> GetIPAddressStatusesByDeviceIdAsync(Guid deviceId)
         {
             using var connection = CreateConnection();
             const string sql = @"
-                SELECT * FROM DeviceInterfaces 
-                WHERE DeviceID = @DeviceId AND IsDeleted = 0";
+                SELECT dia.ID as IPAddressID, cst.Name as Status
+                FROM DeviceIPAddresses dia
+                OUTER APPLY (
+                    SELECT TOP 1 diacs.ConnectionStatusTypeID
+                    FROM DeviceIPAddressConnectionStatus diacs
+                    WHERE diacs.DeviceIPAddressID = dia.ID AND diacs.IsDeleted = 0
+                    ORDER BY diacs.LastCheckedDate DESC
+                ) AS LatestStatus(ConnectionStatusTypeID)
+                LEFT JOIN ConnectionStatusTypes cst ON LatestStatus.ConnectionStatusTypeID = cst.ID
+                WHERE dia.DeviceID = @DeviceId AND dia.IsDeleted = 0";
 
-            return await connection.QueryAsync<DeviceInterface>(sql, new { DeviceId = deviceId });
-        }
-
-        public async Task<Guid> CreateInterfaceAsync(DeviceInterface deviceInterface)
-        {
-            using var connection = CreateConnection();
-            deviceInterface.ID = Guid.NewGuid();
-            deviceInterface.IsDeleted = false;
-
-            const string sql = @"
-                INSERT INTO DeviceInterfaces 
-                (ID, DeviceID, Name, MACAddress, IPAddress, SubnetMask, SpeedMbps, IsEnabled, IsDeleted)
-                VALUES 
-                (@ID, @DeviceID, @Name, @MACAddress, @IPAddress, @SubnetMask, @SpeedMbps, @IsEnabled, @IsDeleted)";
-
-            await connection.ExecuteAsync(sql, deviceInterface);
-            return deviceInterface.ID;
-        }
-
-        public async Task<bool> UpdateInterfaceAsync(DeviceInterface deviceInterface)
-        {
-            using var connection = CreateConnection();
-            const string sql = @"
-                UPDATE DeviceInterfaces 
-                SET Name = @Name,
-                    MACAddress = @MACAddress,
-                    IPAddress = @IPAddress,
-                    SubnetMask = @SubnetMask,
-                    SpeedMbps = @SpeedMbps,
-                    IsEnabled = @IsEnabled
-                WHERE ID = @ID AND IsDeleted = 0";
-
-            var rowsAffected = await connection.ExecuteAsync(sql, deviceInterface);
-            return rowsAffected > 0;
-        }
-
-        public async Task<bool> DeleteInterfaceAsync(Guid id)
-        {
-            using var connection = CreateConnection();
-            const string sql = "UPDATE DeviceInterfaces SET IsDeleted = 1 WHERE ID = @Id";
-            var rowsAffected = await connection.ExecuteAsync(sql, new { Id = id });
-            return rowsAffected > 0;
+            var result = await connection.QueryAsync<(Guid IPAddressID, string Status)>(sql, new { DeviceId = deviceId });
+            return result.ToDictionary(r => r.IPAddressID, r => r.Status ?? "Unknown");
         }
 
         #endregion

@@ -9,6 +9,8 @@ const DeviceDetails = () => {
     const { id } = useParams();
     const [device, setDevice] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [monitoredFiles, setMonitoredFiles] = useState([]);
+    const [activeTab, setActiveTab] = useState('overview');
 
     const fetchDevice = useCallback(async () => {
         setLoading(true);
@@ -22,11 +24,24 @@ const DeviceDetails = () => {
         }
     }, [id]);
 
+    const fetchMonitoredFiles = useCallback(async () => {
+        try {
+            const data = await apiService.getDeviceMonitoredFiles(id);
+            setMonitoredFiles(data);
+        } catch (error) {
+            console.error('Error fetching monitored files:', error);
+        }
+    }, [id]);
+
     useEffect(() => {
         fetchDevice();
     }, [fetchDevice]);
 
-
+    useEffect(() => {
+        if (activeTab === 'files' && monitoredFiles.length === 0) {
+            fetchMonitoredFiles();
+        }
+    }, [activeTab, monitoredFiles.length, fetchMonitoredFiles]);
 
     const handleBack = () => {
         navigate('/devices');
@@ -34,6 +49,42 @@ const DeviceDetails = () => {
 
     const handleEdit = () => {
         navigate(`/devices/${id}/edit`);
+    };
+
+    const formatFileSize = (bytes) => {
+        if (!bytes || bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    };
+
+    // Get overall device status from IP addresses
+    const getOverallStatus = () => {
+        if (!device?.ipAddresses || device.ipAddresses.length === 0) return null;
+        const hasUp = device.ipAddresses.some(ip => ip.status === 'UP');
+        const hasDown = device.ipAddresses.some(ip => ip.status === 'DOWN');
+        if (hasUp) return 'UP';
+        if (hasDown) return 'DOWN';
+        return null;
+    };
+
+    // Heartbeat SVG component
+    const HeartbeatPulse = ({ status, small = false }) => {
+        const isUp = status === 'UP';
+        const isDown = status === 'DOWN';
+        const statusClass = isUp ? 'status-up' : isDown ? 'status-down' : '';
+
+        return (
+            <div className={`heartbeat-container ${statusClass} ${small ? 'small' : ''}`}>
+                <svg className="heartbeat-svg" viewBox="0 0 100 40">
+                    <path
+                        className="heartbeat-path"
+                        d="M 0,20 L 15,20 L 20,10 L 25,30 L 30,15 L 35,25 L 40,20 L 55,20 L 60,5 L 65,35 L 70,20 L 100,20"
+                    />
+                </svg>
+            </div>
+        );
     };
 
     if (loading) {
@@ -56,6 +107,8 @@ const DeviceDetails = () => {
         );
     }
 
+    const overallStatus = getOverallStatus();
+
     return (
         <div className="device-container">
             {/* Header */}
@@ -64,145 +117,146 @@ const DeviceDetails = () => {
                     <button className="btn-back" onClick={handleBack}>
                         ← Back
                     </button>
-                    <h1 className="page-title">
-                        <span className="title-icon">💻</span>
-                        {device.name}
-                    </h1>
+                    <h1 className="page-title">{device.name}</h1>
+                    {overallStatus && <HeartbeatPulse status={overallStatus} small={true} />}
                 </div>
                 <div className="header-actions">
                     <button className="btn-primary" onClick={handleEdit}>
-                        ✏️ Edit Device
+                        ✏️ Edit
                     </button>
                 </div>
             </div>
 
-            {/* Details Cards */}
-            <div className="details-grid">
-                {/* Basic Information */}
-                <div className="details-card">
-                    <h2 className="card-title">Basic Information</h2>
-                    <div className="details-list">
-                        <div className="detail-item">
-                            <span className="detail-label">Name</span>
-                            <span className="detail-value">{device.name}</span>
-                        </div>
-                        <div className="detail-item">
-                            <span className="detail-label">HostName</span>
-                            <span className="detail-value">{device.hostName || '-'}</span>
-                        </div>
-                        <div className="detail-item">
-                            <span className="detail-label">Device Type</span>
-                            <span className="detail-value">
-                                <span className="badge badge-type">{device.deviceTypeName || '-'}</span>
-                            </span>
-                        </div>
-                        <div className="detail-item">
-                            <span className="detail-label">Operating System</span>
-                            <span className="detail-value">
-                                <span className="badge badge-os">{device.osTypeName || '-'}</span>
-                            </span>
-                        </div>
-                        <div className="detail-item">
-                            <span className="detail-label">Connection Type</span>
-                            <span className="detail-value">
-                                <span className="badge badge-connection">{device.connectionTypeName || '-'}</span>
-                            </span>
-                        </div>
-                        <div className="detail-item">
-                            <span className="detail-label">Remark</span>
-                            <span className="detail-value">{device.remark || '-'}</span>
-                        </div>
-                    </div>
-                </div>
+            {/* Simple Tabs */}
+            <div className="simple-tabs">
+                <button
+                    className={`simple-tab ${activeTab === 'overview' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('overview')}
+                >
+                    Overview
+                </button>
+                <button
+                    className={`simple-tab ${activeTab === 'ip' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('ip')}
+                >
+                    IP Addresses
+                </button>
+                <button
+                    className={`simple-tab ${activeTab === 'files' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('files')}
+                >
+                    Monitored Files
+                </button>
+            </div>
 
-                {/* Timestamps */}
-                <div className="details-card">
-                    <h2 className="card-title">Timestamps</h2>
-                    <div className="details-list">
-                        <div className="detail-item">
-                            <span className="detail-label">Created</span>
-                            <span className="detail-value">
-                                {new Date(device.createdDate).toLocaleString()}
-                            </span>
-                        </div>
-                        <div className="detail-item">
-                            <span className="detail-label">Last Updated</span>
-                            <span className="detail-value">
-                                {device.updatedDate
-                                    ? new Date(device.updatedDate).toLocaleString()
-                                    : '-'}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* IP Addresses */}
-                <div className="details-card full-width">
-                    <h2 className="card-title">IP Addresses</h2>
-                    {device.ipAddresses && device.ipAddresses.length > 0 ? (
-                        <table className="details-table">
-                            <thead>
-                                <tr>
-                                    <th>Type</th>
-                                    <th>IP Address</th>
-                                    <th>Description</th>
-                                </tr>
-                            </thead>
+            {/* Tab Content */}
+            <div className="simple-tab-content">
+                {activeTab === 'overview' && (
+                    <div className="simple-card">
+                        <table className="simple-table">
                             <tbody>
-                                {device.ipAddresses.map(ip => (
-                                    <tr key={ip.id}>
-                                        <td>
-                                            <span className="badge badge-type">
-                                                {ip.ipAddressTypeName || '-'}
-                                            </span>
-                                        </td>
-                                        <td className="ip-value">{ip.ipAddress}</td>
-                                        <td>{ip.description || '-'}</td>
-                                    </tr>
-                                ))}
+                                <tr>
+                                    <td className="label-cell">Name</td>
+                                    <td className="value-cell">{device.name}</td>
+                                </tr>
+                                <tr>
+                                    <td className="label-cell">Hostname</td>
+                                    <td className="value-cell">{device.hostName || '-'}</td>
+                                </tr>
+                                <tr>
+                                    <td className="label-cell">Device Type</td>
+                                    <td className="value-cell">{device.deviceTypeName || '-'}</td>
+                                </tr>
+                                <tr>
+                                    <td className="label-cell">Operating System</td>
+                                    <td className="value-cell">{device.osTypeName || '-'}</td>
+                                </tr>
+                                <tr>
+                                    <td className="label-cell">Connection Type</td>
+                                    <td className="value-cell">{device.connectionTypeName || '-'}</td>
+                                </tr>
+                                <tr>
+                                    <td className="label-cell">Remark</td>
+                                    <td className="value-cell">{device.remark || '-'}</td>
+                                </tr>
+                                <tr>
+                                    <td className="label-cell">Created Date</td>
+                                    <td className="value-cell">{new Date(device.createdDate).toLocaleString()}</td>
+                                </tr>
+                                <tr>
+                                    <td className="label-cell">Last Updated</td>
+                                    <td className="value-cell">
+                                        {device.updatedDate ? new Date(device.updatedDate).toLocaleString() : '-'}
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
-                    ) : (
-                        <p className="no-items-text">No IP addresses configured</p>
-                    )}
-                </div>
+                    </div>
+                )}
 
-                {/* Interfaces */}
-                <div className="details-card full-width">
-                    <h2 className="card-title">Network Interfaces</h2>
-                    {device.interfaces && device.interfaces.length > 0 ? (
-                        <table className="details-table">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>MAC Address</th>
-                                    <th>IP Address</th>
-                                    <th>Subnet Mask</th>
-                                    <th>Speed</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {device.interfaces.map(iface => (
-                                    <tr key={iface.id}>
-                                        <td>{iface.name}</td>
-                                        <td>{iface.macAddress || '-'}</td>
-                                        <td className="ip-value">{iface.ipAddress || '-'}</td>
-                                        <td>{iface.subnetMask || '-'}</td>
-                                        <td>{iface.speedMbps ? `${iface.speedMbps} Mbps` : '-'}</td>
-                                        <td>
-                                            <span className={`status-badge ${iface.isEnabled ? 'status-active' : 'status-inactive'}`}>
-                                                {iface.isEnabled ? 'Enabled' : 'Disabled'}
-                                            </span>
-                                        </td>
+                {activeTab === 'ip' && (
+                    <div className="simple-card">
+                        {device.ipAddresses && device.ipAddresses.length > 0 ? (
+                            <table className="simple-table data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>IP Address</th>
+                                        <th>Description</th>
+                                        <th>Status</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    ) : (
-                        <p className="no-items-text">No network interfaces configured</p>
-                    )}
-                </div>
+                                </thead>
+                                <tbody>
+                                    {device.ipAddresses.map(ip => (
+                                        <tr key={ip.id}>
+                                            <td>{ip.ipAddressTypeName || '-'}</td>
+                                            <td className="ip-value">{ip.ipAddress}</td>
+                                            <td>{ip.description || '-'}</td>
+                                            <td className="status-cell">
+                                                <HeartbeatPulse status={ip.status} small={true} />
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        ) : (
+                            <p className="empty-message">No IP addresses configured</p>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === 'files' && (
+                    <div className="simple-card">
+                        {monitoredFiles.length > 0 ? (
+                            <table className="simple-table data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Directory</th>
+                                        <th>File Name</th>
+                                        <th>File Size</th>
+                                        <th>Last Scan</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {monitoredFiles.map(file => (
+                                        <tr key={file.id}>
+                                            <td className="path-cell">{file.directoryPath}</td>
+                                            <td>{file.fileName}</td>
+                                            <td>{formatFileSize(file.fileSize)}</td>
+                                            <td>
+                                                {file.lastScan
+                                                    ? new Date(file.lastScan).toLocaleString()
+                                                    : 'Never'}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        ) : (
+                            <p className="empty-message">No monitored files found</p>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );
