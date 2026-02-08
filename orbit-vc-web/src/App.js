@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { Login, SignUp, Forgot } from './Pages/User';
-import { DeviceList, DeviceForm, DeviceDetails } from './Pages/Device';
+import { DeviceList, DeviceForm, DeviceDetails, DeviceMonitoredFiles } from './Pages/Device';
 import './App.css';
 
 // Layout component for authenticated pages
@@ -188,6 +188,14 @@ function App() {
           element={
             <ProtectedRoute>
               <DeviceForm />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/devices/:id/monitored-files"
+          element={
+            <ProtectedRoute>
+              <DeviceMonitoredFiles />
             </ProtectedRoute>
           }
         />

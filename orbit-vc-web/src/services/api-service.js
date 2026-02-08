@@ -287,6 +287,80 @@ class ApiService {
     async getIPAddressTypes() {
         return await this.get('/Device/lookup/ip-address-types');
     }
+
+    // ============================================
+    // FileControl API Methods (Monitored Directories & Files)
+    // ============================================
+
+    /**
+     * Get monitored directories by device ID
+     */
+    async getMonitoredDirectoriesByDevice(deviceId) {
+        return await this.get(`/FileControl/directories/device/${deviceId}`);
+    }
+
+    /**
+     * Get monitored directory by ID
+     */
+    async getMonitoredDirectoryById(id) {
+        return await this.get(`/FileControl/directories/${id}`);
+    }
+
+    /**
+     * Create a new monitored directory
+     */
+    async createMonitoredDirectory(directoryData) {
+        return await this.post('/FileControl/directories', directoryData);
+    }
+
+    /**
+     * Update a monitored directory
+     */
+    async updateMonitoredDirectory(directoryData) {
+        return await this.put('/FileControl/directories', directoryData);
+    }
+
+    /**
+     * Delete a monitored directory
+     */
+    async deleteMonitoredDirectory(id) {
+        return await this.delete(`/FileControl/directories/${id}`);
+    }
+
+    /**
+     * Get monitored files by directory ID
+     */
+    async getMonitoredFilesByDirectory(directoryId) {
+        return await this.get(`/FileControl/files/directory/${directoryId}`);
+    }
+
+    /**
+     * Get monitored file by ID
+     */
+    async getMonitoredFileById(id) {
+        return await this.get(`/FileControl/files/${id}`);
+    }
+
+    /**
+     * Create a new monitored file
+     */
+    async createMonitoredFile(fileData) {
+        return await this.post('/FileControl/files', fileData);
+    }
+
+    /**
+     * Update a monitored file
+     */
+    async updateMonitoredFile(fileData) {
+        return await this.put('/FileControl/files', fileData);
+    }
+
+    /**
+     * Delete a monitored file
+     */
+    async deleteMonitoredFile(id) {
+        return await this.delete(`/FileControl/files/${id}`);
+    }
 }
 
 const apiService = new ApiService();
