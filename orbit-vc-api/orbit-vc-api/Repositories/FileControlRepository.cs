@@ -101,15 +101,18 @@ namespace orbit_vc_api.Repositories
         public async Task<Guid> CreateMonitoredFileAsync(MonitoredFile file)
         {
             using var connection = CreateConnection();
-            file.ID = Guid.NewGuid();
+            if (file.ID == Guid.Empty)
+            {
+                file.ID = Guid.NewGuid();
+            }
             file.CreatedDate = DateTime.UtcNow;
             file.IsDeleted = false;
 
             const string sql = @"
                 INSERT INTO MonitoredFiles 
-                (ID, MonitoredDirectoryID, FilePath, FileName, FileSize, FileHash, LastScan, FileDateModified, StoredDirectory, IsDeleted, CreatedDate)
+                (ID, MonitoredDirectoryID, LastScan, IsDeleted, CreatedDate)
                 VALUES 
-                (@ID, @MonitoredDirectoryID, @FilePath, @FileName, @FileSize, @FileHash, @LastScan, @FileDateModified, @StoredDirectory, @IsDeleted, @CreatedDate)";
+                (@ID, @MonitoredDirectoryID, @LastScan, @IsDeleted, @CreatedDate)";
 
             await connection.ExecuteAsync(sql, file);
             return file.ID;
@@ -120,14 +123,9 @@ namespace orbit_vc_api.Repositories
             using var connection = CreateConnection();
             const string sql = @"
                 UPDATE MonitoredFiles 
-                SET FilePath = @FilePath,
-                    FileName = @FileName,
-                    FileSize = @FileSize,
-                    FileHash = @FileHash,
-                    LastScan = @LastScan,
-                    FileDateModified = @FileDateModified,
-                    StoredDirectory = @StoredDirectory
-                WHERE ID = @ID AND IsDeleted = 0";
+                SET LastScan = @LastScan,
+                    IsDeleted = @IsDeleted
+                WHERE ID = @ID";
 
             var rowsAffected = await connection.ExecuteAsync(sql, file);
             return rowsAffected > 0;
@@ -139,6 +137,34 @@ namespace orbit_vc_api.Repositories
             const string sql = "UPDATE MonitoredFiles SET IsDeleted = 1 WHERE ID = @Id";
             var rowsAffected = await connection.ExecuteAsync(sql, new { Id = id });
             return rowsAffected > 0;
+        }
+
+        public async Task<Guid> CreateMonitoredFileVersionAsync(MonitoredFileVersion version)
+        {
+            using var connection = CreateConnection();
+            if (version.ID == Guid.Empty) version.ID = Guid.NewGuid();
+            version.CreatedDate = DateTime.UtcNow;
+
+            const string sql = @"
+                INSERT INTO MonitoredFileVersions 
+                (ID, MonitoredFileID, VersionNo, FileDateModified, FileSize, FileHash, DetectedDate, StoredDirectory, FilePath, FileName, IsDeleted, CreatedDate)
+                VALUES 
+                (@ID, @MonitoredFileID, @VersionNo, @FileDateModified, @FileSize, @FileHash, @DetectedDate, @StoredDirectory, @FilePath, @FileName, @IsDeleted, @CreatedDate)";
+
+            await connection.ExecuteAsync(sql, version);
+            return version.ID;
+        }
+
+        public async Task<MonitoredFileVersion?> GetLatestFileVersionAsync(Guid fileId)
+        {
+            using var connection = CreateConnection();
+            const string sql = @"
+                SELECT TOP 1 * 
+                FROM MonitoredFileVersions 
+                WHERE MonitoredFileID = @FileId 
+                ORDER BY VersionNo DESC";
+            
+            return await connection.QuerySingleOrDefaultAsync<MonitoredFileVersion>(sql, new { FileId = fileId });
         }
 
         #endregion

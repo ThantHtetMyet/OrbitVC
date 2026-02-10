@@ -1,10 +1,10 @@
-
 import os
 import hashlib
 import pyodbc
 import uuid
 import logging
 from datetime import datetime
+import shutil
 
 # Setup module-level logger
 logger = logging.getLogger("MonitorVersionControl")
@@ -29,6 +29,19 @@ def compute_file_hash(filepath):
             sha256_hash.update(byte_block)
     return sha256_hash.hexdigest()
 
+def construct_unc_path(ip, full_path_on_device):
+    drive, path_tail = os.path.splitdrive(full_path_on_device)
+    if drive:
+        drive_letter = drive[0]
+        # Construct UNC: \\IP\C$\Path\File
+        unc_base = f"\\\\{ip}\\{drive_letter}${path_tail}"
+        return unc_base
+    elif full_path_on_device.startswith("\\\\"):
+        # Already a UNC path
+        return full_path_on_device
+    else:
+        return full_path_on_device
+
 def run(config):
     logger.info("Starting Version Control Monitor check...")
     conn = None
@@ -38,74 +51,68 @@ def run(config):
         
         # 0. Fetch Device IPs (prioritize Network-01)
         device_ips = {}
-        try:
-            cursor.execute("""
-                SELECT ip.DeviceID, ip.IPAddress, ipt.Name
-                FROM DeviceIPAddresses ip
-                LEFT JOIN IPAddressTypes ipt ON ip.IPAddressTypeID = ipt.ID
-            """)
-            for row in cursor.fetchall():
-                did, ip, typename = row.DeviceID, row.IPAddress, row.Name
-                # Store first found, overwrite if Network-01 found
-                if did not in device_ips:
-                    device_ips[did] = ip
-                elif typename == 'Network-01':
-                    device_ips[did] = ip
-        except Exception as e:
-            logger.error(f"Error fetching IPs: {e}")
+        # Optimization: Query files first, then get IP for each device as needed to avoid fetching all if loop handles it?
+        # But we previously fetched specific IPs inside loop using device_id.
+        # Let's keep logic simple: Query files, loop, query IP per file/device.
 
-        # Get Monitored Files with Directory Info
-        query = """
-        SELECT 
-            mf.ID, mf.FileName, mf.FileHash, mf.LastScan, mf.FileSize,
-            md.DirectoryPath, md.ID as DirectoryID, md.DeviceID
-        FROM MonitoredFiles mf
-        JOIN MonitoredDirectories md ON mf.MonitoredDirectoryID = md.ID
-        WHERE mf.IsDeleted = 0 AND md.IsDeleted = 0 AND md.IsActive = 1
-        """
-        cursor.execute(query)
-        files = cursor.fetchall()
+        # Select files (Join with latest version)
+        cursor.execute("""
+            SELECT 
+                mf.ID, v.FilePath, v.FileName, v.FileHash, v.FileSize, v.StoredDirectory,
+                md.DirectoryPath, md.ID as DirectoryID, md.DeviceID, v.VersionNo
+            FROM MonitoredFiles mf
+            JOIN MonitoredFileVersions v ON mf.ID = v.MonitoredFileID
+            JOIN MonitoredDirectories md ON mf.MonitoredDirectoryID = md.ID
+            WHERE v.VersionNo = (SELECT MAX(VersionNo) FROM MonitoredFileVersions WHERE MonitoredFileID = mf.ID)
+            AND mf.IsDeleted = 0
+        """)
         
-        for row in files:
-            file_id = row.ID
-            file_name = row.FileName
-            old_hash = row.FileHash
-            directory_path = row.DirectoryPath
-            directory_id = row.DirectoryID
-            device_id = row.DeviceID
-            
-            # Construct full path logic
-            full_path = ""
-            ip = device_ips.get(device_id)
-            
-            if ip:
-                drive, path_tail = os.path.splitdrive(directory_path)
-                if drive:
-                    drive_letter = drive[0]
-                    # Construc UNC: \\IP\C$\Path\File
-                    unc_base = f"\\\\{ip}\\{drive_letter}${path_tail}"
-                    full_path = os.path.join(unc_base, file_name)
-                elif directory_path.startswith("\\\\"):
-                    full_path = os.path.join(directory_path, file_name)
-                else:
-                    full_path = os.path.join(directory_path, file_name)
-            else:
-                 full_path = os.path.join(directory_path, file_name)
-            
-            if not os.path.exists(full_path):
-                logger.warning(f"File not found: {full_path}")
-                # Logic for DELETED file could go here (e.g., create alert if not already alerted)
-                # detailed handling omitted to avoid spamming alerts, but could be added.
-                continue
-
+        rows = cursor.fetchall()
+        
+        for row in rows:
             try:
+                file_id = row.ID
+                ver_file_path = row.FilePath
+                file_name = row.FileName
+                old_hash = row.FileHash
+                old_size = row.FileSize
+                stored_dir = row.StoredDirectory
+                directory_path = row.DirectoryPath
+                directory_id = row.DirectoryID
+                device_id = row.DeviceID
+                current_ver_no = row.VersionNo
+
+                # Get IP Address (Network-01 preferred)
+                cursor.execute("""
+                    SELECT ip.IPAddress 
+                    FROM DeviceIPAddresses ip
+                    LEFT JOIN IPAddressTypes ipt ON ip.IPAddressTypeID = ipt.ID
+                    WHERE ip.DeviceID = ? AND (ip.IPAddress LIKE '10.%' OR ip.IPAddress LIKE '192.%')
+                """, device_id)
+                ip_row = cursor.fetchone()
+                if not ip_row:
+                    cursor.execute("SELECT TOP 1 IPAddress FROM DeviceIPAddresses WHERE DeviceID = ?", device_id)
+                    ip_row = cursor.fetchone()
+                
+                if not ip_row:
+                    logger.warning(f"No IP found for device {device_id}, skipping {file_name}")
+                    continue
+                    
+                ip_address = ip_row[0]
+                
+                full_path = os.path.join(construct_unc_path(ip_address, directory_path), file_name)
+                
+                if not os.path.exists(full_path):
+                    logger.warning(f"File not found: {full_path}")
+                    continue
+                    
                 current_hash = compute_file_hash(full_path)
                 file_size_bytes = os.path.getsize(full_path)
                 file_size_str = str(file_size_bytes)
                 mtime = os.path.getmtime(full_path)
                 file_date_mod = datetime.fromtimestamp(mtime)
                 
-                # Check for modification OR handling first-time scan (if old_hash is None)
+                # Check for modification
                 if old_hash != current_hash:
                     change_type = 'MODIFIED' if old_hash else 'CREATED'
                     logger.info(f"File {change_type}: {full_path}")
@@ -119,25 +126,57 @@ def run(config):
                         VALUES (?, ?, ?, ?, GETDATE(), 0, 0)
                     """, (alert_id, file_id, change_type, alert_msg))
                     
-                    # Update MonitoredFile
+                    # Handle File Versioning / Storage
+                    stored_files_path = config.get('stored_files_path')
+                    new_stored_path = ''
+                    next_ver = current_ver_no + 1
+                    
+                    if stored_files_path:
+                        try:
+                            # Base path: stored_files_path/FileID
+                            file_base_path = os.path.join(stored_files_path, str(file_id))
+                            if not os.path.exists(file_base_path):
+                                os.makedirs(file_base_path, exist_ok=True)
+                            
+                            ver_folder = os.path.join(file_base_path, f"Version-{next_ver}")
+                            os.makedirs(ver_folder, exist_ok=True)
+                            
+                            dest_path = os.path.join(ver_folder, file_name)
+                            shutil.copy2(full_path, dest_path)
+                            new_stored_path = dest_path
+                            logger.info(f"Archived version {next_ver} to {new_stored_path}")
+                        except Exception as e:
+                            logger.error(f"Failed to archive file version: {str(e)}")
+
+                    # Insert New Version
+                    new_ver_id = uuid.uuid4()
+                    # We use ver_file_path (original input path) for the new version too? Or full_path?
+                    # The schema says "FilePath". Let's use ver_file_path (user defined path) to be consistent.
+                    cursor.execute("""
+                        INSERT INTO MonitoredFileVersions 
+                        (ID, MonitoredFileID, VersionNo, FileDateModified, FileSize, FileHash, DetectedDate, StoredDirectory, FilePath, FileName, IsDeleted, CreatedDate)
+                        VALUES 
+                        (?, ?, ?, ?, ?, ?, GETDATE(), ?, ?, ?, 0, GETDATE())
+                    """, (new_ver_id, file_id, next_ver, file_date_mod, file_size_str, current_hash, new_stored_path, ver_file_path if ver_file_path else '', file_name))
+
+                    # Update MonitoredFile LastScan
                     cursor.execute("""
                         UPDATE MonitoredFiles 
-                        SET FileHash = ?, FileSize = ?, LastScan = GETDATE(), FileDateModified = ?
+                        SET LastScan = GETDATE()
                         WHERE ID = ?
-                    """, (current_hash, file_size_str, file_date_mod, file_id))
+                    """, (file_id,))
                     
                     conn.commit()
-                    logger.info(f"Processed changes for {file_name}")
+                    logger.info(f"Processed changes for {file_name} (New Version: {next_ver})")
                 
                 else:
-                    # No change, just update LastScan time to show we checked
+                    # No change
                     cursor.execute("UPDATE MonitoredFiles SET LastScan = GETDATE() WHERE ID = ?", file_id)
                     conn.commit()
-                    
+
             except Exception as e:
-                logger.error(f"Error processing file {full_path}: {e}")
-                # Optionally log scan failure
-                
+                logger.error(f"Error processing file {file_name if 'file_name' in locals() else 'unknown'}: {e}")
+
     except Exception as e:
         logger.error(f"Database Error: {e}")
     finally:

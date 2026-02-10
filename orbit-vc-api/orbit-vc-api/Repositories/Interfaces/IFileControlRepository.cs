@@ -20,6 +20,10 @@ namespace orbit_vc_api.Repositories.Interfaces
         Task<bool> UpdateMonitoredFileAsync(MonitoredFile file);
         Task<bool> DeleteMonitoredFileAsync(Guid id);
 
+        // MonitoredFileVersion
+        Task<Guid> CreateMonitoredFileVersionAsync(MonitoredFileVersion version);
+        Task<MonitoredFileVersion?> GetLatestFileVersionAsync(Guid fileId);
+
 
 
         // MonitoredFileAlert

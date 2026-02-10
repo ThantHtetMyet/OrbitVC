@@ -134,49 +134,59 @@ namespace orbit_vc_api.Controllers
             return Ok(file);
         }
 
-        [HttpPost("files")]
-        public async Task<ActionResult<Guid>> CreateFile(MonitoredFile file)
+        public class CreateFileRequest
         {
+            public Guid MonitoredDirectoryID { get; set; }
+            public string FilePath { get; set; } = string.Empty;
+            public string FileName { get; set; } = string.Empty;
+        }
+
+        [HttpPost("files")]
+        public async Task<ActionResult<Guid>> CreateFile(CreateFileRequest input)
+        {
+            if (string.IsNullOrEmpty(input.FilePath) || string.IsNullOrEmpty(input.FileName))
+                return BadRequest("FilePath and FileName are required");
+
             try
             {
-                // Get directory to construct full path
-                var directory = await _repository.GetMonitoredDirectoryByIdAsync(file.MonitoredDirectoryID);
-                if (directory == null)
-                {
-                    _logger.LogActivity("File Creation Failed", "Directory not found");
-                    return BadRequest("Invalid Directory ID"); 
-                }
+                var directory = await _repository.GetMonitoredDirectoryByIdAsync(input.MonitoredDirectoryID);
+                if (directory == null) return NotFound("Directory not found");
 
-                // Get Device IP (Network-01)
-                var device = await _deviceRepository.GetByIdAsync(directory.DeviceID);
-                if (device == null)
-                {
-                     _logger.LogActivity("File Creation Failed", "Device not found");
-                     return BadRequest("Device not found");
-                }
+                // Get IP
+                var device = await _deviceRepository.GetDeviceByIdAsync(directory.DeviceID);
+                if (device == null) return BadRequest("Device not found");
+                
+                var ipAddresses = await _deviceRepository.GetDeviceIPAddressesAsync(device.ID);
+                string? targetIp = ipAddresses.FirstOrDefault(ip => ip.IPAddress.StartsWith("10.") || ip.IPAddress.StartsWith("192."))?.IPAddress 
+                                ?? ipAddresses.FirstOrDefault()?.IPAddress;
 
-                string? targetIp = null;
-                if (device.IPAddresses != null)
-                {
-                    // Look for Network-01
-                    var primaryIp = device.IPAddresses.FirstOrDefault(ip => ip.IPAddressType?.Name == "Network-01");
-                    targetIp = primaryIp?.IPAddress;
+                if (string.IsNullOrEmpty(targetIp)) return BadRequest("No IP address found for device");
 
-                    // Fallback to first if not found? User requirement seems specific to Network-01
-                    if (string.IsNullOrEmpty(targetIp))
-                    {
-                        targetIp = device.IPAddresses.FirstOrDefault()?.IPAddress;
-                    }
-                }
+                var parent = new MonitoredFile
+                {
+                    ID = Guid.NewGuid(),
+                    MonitoredDirectoryID = input.MonitoredDirectoryID,
+                    LastScan = DateTime.UtcNow,
+                    IsDeleted = false,
+                    CreatedDate = DateTime.UtcNow
+                };
 
-                if (string.IsNullOrEmpty(targetIp))
+                var version = new MonitoredFileVersion
                 {
-                    _logger.LogError("System", "FILE_SCAN_WARNING", $"No IP address found for device {device.Name} (ID: {device.ID}). Cannot scan file remotely.");
-                    // Proceed without scanning
-                }
-                else
+                    ID = Guid.NewGuid(),
+                    MonitoredFileID = parent.ID,
+                    VersionNo = 1,
+                    FilePath = input.FilePath,
+                    FileName = input.FileName,
+                    IsDeleted = false,
+                    CreatedDate = DateTime.UtcNow,
+                    DetectedDate = DateTime.UtcNow,
+                    FileDateModified = DateTime.UtcNow
+                };
+
+                // Scan Logic
                 {
-                    var fullPath = Path.Combine(directory.DirectoryPath, file.FileName);
+                    var fullPath = Path.Combine(directory.DirectoryPath, input.FileName);
                     
                     // Determine local destination path for copy
                     string? destPath = null;
@@ -185,9 +195,11 @@ namespace orbit_vc_api.Controllers
                     {
                         try 
                         {
-                            if (!Directory.Exists(storedFilesPath)) Directory.CreateDirectory(storedFilesPath);
-                            // Store with unique ID to prevent collisions
-                            destPath = Path.Combine(storedFilesPath, $"{Guid.NewGuid()}_{file.FileName}");
+                            var idPath = Path.Combine(storedFilesPath, parent.ID.ToString());
+                            var verPath = Path.Combine(idPath, "Version-1");
+                            if (!Directory.Exists(verPath)) Directory.CreateDirectory(verPath);
+                            
+                            destPath = Path.Combine(verPath, input.FileName);
                         }
                         catch (Exception ex)
                         {
@@ -200,40 +212,40 @@ namespace orbit_vc_api.Controllers
                     
                     if (fileInfo.Success)
                     {
-                        file.FileSize = fileInfo.FileSize;
-                        file.FileHash = fileInfo.FileHash;
-                        file.LastScan = DateTime.UtcNow;
+                        version.FileSize = fileInfo.FileSize;
+                        version.FileHash = fileInfo.FileHash;
+                        parent.LastScan = DateTime.UtcNow;
+
                         if (!string.IsNullOrEmpty(destPath))
                         {
-                            file.StoredDirectory = destPath;
+                            version.StoredDirectory = destPath;
                         }
                         
                         if (DateTime.TryParse(fileInfo.FileDateModified, out var dt))
                         {
-                            file.FileDateModified = dt;
+                            version.FileDateModified = dt;
                         }
                         else 
                         {
-                            file.FileDateModified = DateTime.UtcNow;
+                            version.FileDateModified = DateTime.UtcNow;
                         }
                         
-                        _logger.LogActivity("File Scan Success", $"Scanned file: {file.FileName}, Size: {file.FileSize}");
+                        _logger.LogActivity("File Scan Success", $"Scanned file: {version.FileName}, Size: {version.FileSize}");
                     }
                     else
                     {
-                        _logger.LogError("System", "FILE_SCAN_ERROR", $"Failed to scan file: {fileInfo.Message}", null);
+                        _logger.LogActivity("File Scan Failed", $"Scan failed: {fileInfo.Message}");
                     }
                 }
 
-                var id = await _repository.CreateMonitoredFileAsync(file);
+                await _repository.CreateMonitoredFileAsync(parent);
+                await _repository.CreateMonitoredFileVersionAsync(version);
                 
-
-
-                return Ok(id);
+                return Ok(parent.ID);
             }
             catch (Exception ex)
             {
-                _logger.LogError("System", "CREATE_FILE_ERROR", "Failed to create file", ex);
+                _logger.LogError("System", "CREATE_MONITORED_FILE_ERROR", "Failed to create monitored file", ex);
                 return StatusCode(500, "Internal server error");
             }
         }

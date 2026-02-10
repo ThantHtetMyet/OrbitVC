@@ -302,23 +302,48 @@ BEGIN
     CREATE TABLE [dbo].[MonitoredFiles](
         [ID] [uniqueidentifier] NOT NULL,
         [MonitoredDirectoryID] [uniqueidentifier] NOT NULL,
-        [FilePath] [nvarchar](500) NOT NULL,
-        [FileName] [nvarchar](500) NOT NULL,
-        [FileSize] [nvarchar](100) NULL,
-        [FileHash] [nvarchar](max) NULL,
         [LastScan] [datetime] NULL,
-        [FileDateModified] [datetime] NOT NULL DEFAULT GETDATE(),
-        [StoredDirectory] [nvarchar](max) NOT NULL DEFAULT '',
         [IsDeleted] [bit] NOT NULL DEFAULT 0,
         [CreatedDate] [datetime] NOT NULL DEFAULT GETDATE(),
         CONSTRAINT [PK_MonitoredFiles] PRIMARY KEY CLUSTERED ([ID] ASC)
     )
 
-    ALTER TABLE [dbo].[MonitoredFiles] WITH CHECK ADD CONSTRAINT [FK_MonitoredFiles_MonitoredDirectories]
-        FOREIGN KEY([MonitoredDirectoryID]) REFERENCES [dbo].[MonitoredDirectories] ([ID])
+    IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[FK_MonitoredFiles_MonitoredDirectories]') AND parent_object_id = OBJECT_ID(N'[dbo].[MonitoredFiles]'))
+    ALTER TABLE [dbo].[MonitoredFiles]  WITH CHECK ADD  CONSTRAINT [FK_MonitoredFiles_MonitoredDirectories] FOREIGN KEY([MonitoredDirectoryID])
+    REFERENCES [dbo].[MonitoredDirectories] ([ID])
+    ON DELETE CASCADE
+
+    ALTER TABLE [dbo].[MonitoredFiles] CHECK CONSTRAINT [FK_MonitoredFiles_MonitoredDirectories]
 END
 GO
 
+-- MonitoredFileVersions
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[MonitoredFileVersions]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[MonitoredFileVersions](
+        [ID] [uniqueidentifier] NOT NULL,
+        [MonitoredFileID] [uniqueidentifier] NOT NULL,
+        [VersionNo] [int] NOT NULL,
+        [FileDateModified] [datetime] NOT NULL,
+        [FileSize] [nvarchar](100) NULL,
+        [FileHash] [nvarchar](max) NULL,
+        [DetectedDate] [datetime] NOT NULL DEFAULT GETDATE(),
+        [StoredDirectory] [nvarchar](max) NOT NULL DEFAULT '',
+        [FilePath] [nvarchar](500) NOT NULL,
+        [FileName] [nvarchar](500) NOT NULL,
+        [IsDeleted] [bit] NOT NULL DEFAULT 0,
+        [CreatedDate] [datetime] NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT [PK_MonitoredFileVersions] PRIMARY KEY CLUSTERED ([ID] ASC)
+    )
+
+    IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[FK_MonitoredFileVersions_MonitoredFiles]') AND parent_object_id = OBJECT_ID(N'[dbo].[MonitoredFileVersions]'))
+    ALTER TABLE [dbo].[MonitoredFileVersions]  WITH CHECK ADD  CONSTRAINT [FK_MonitoredFileVersions_MonitoredFiles] FOREIGN KEY([MonitoredFileID])
+    REFERENCES [dbo].[MonitoredFiles] ([ID])
+    ON DELETE CASCADE
+
+    ALTER TABLE [dbo].[MonitoredFileVersions] CHECK CONSTRAINT [FK_MonitoredFileVersions_MonitoredFiles]
+END
+GO
 
 
 /****** Object:  Table [dbo].[MonitoredFileAlerts] ******/

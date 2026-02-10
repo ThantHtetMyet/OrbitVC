@@ -14,6 +14,7 @@
     "scheduler": {
         "check_interval_seconds": 10
     },
+    "stored_files_path": "C:\\Users\\thanthtet.myet\\Documents\\01_Willowglen\\B_001_Workplace\\OrbitVC\\orbit-vc-api\\orbit-vc-api\\Resources",
     "modules": [
         {
             "name": "PingCheck",
