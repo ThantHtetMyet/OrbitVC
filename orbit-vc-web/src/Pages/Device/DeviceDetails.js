@@ -86,11 +86,18 @@ const DeviceDetails = () => {
     };
 
     const formatFileSize = (bytes) => {
-        if (!bytes || bytes === 0) return '-';
+        if (!bytes) return '-';
+        const numBytes = parseFloat(bytes);
+        if (isNaN(numBytes) || numBytes === 0) return '-';
+
         const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(numBytes) / Math.log(k));
+
+        if (i < 0) return numBytes + ' Bytes';
+        const sizeIndex = Math.min(i, sizes.length - 1);
+
+        return parseFloat((numBytes / Math.pow(k, sizeIndex)).toFixed(2)) + ' ' + sizes[sizeIndex];
     };
 
     const showModal = (title, message, type = 'info', onConfirm = null) => {

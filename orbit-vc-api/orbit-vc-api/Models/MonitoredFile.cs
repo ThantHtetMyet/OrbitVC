@@ -12,5 +12,7 @@ namespace orbit_vc_api.Models
         public DateTime? LastScan { get; set; }
         public bool IsDeleted { get; set; }
         public DateTime CreatedDate { get; set; }
+        public DateTime FileDateModified { get; set; }
+        public string StoredDirectory { get; set; } = string.Empty;
     }
 }

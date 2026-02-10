@@ -20,6 +20,12 @@
             "enabled": true,
             "module_path": "01_Ping_DeviceIPAddress.ping_check",
             "interval_minutes": 1
+        },
+        {
+            "name": "MonitorVersionControl",
+            "enabled": true,
+            "module_path": "02_Monitor_VersionControl.monitor_files",
+            "interval_minutes": 1
         }
     ]
 }

@@ -307,6 +307,8 @@ BEGIN
         [FileSize] [nvarchar](100) NULL,
         [FileHash] [nvarchar](max) NULL,
         [LastScan] [datetime] NULL,
+        [FileDateModified] [datetime] NOT NULL DEFAULT GETDATE(),
+        [StoredDirectory] [nvarchar](max) NOT NULL DEFAULT '',
         [IsDeleted] [bit] NOT NULL DEFAULT 0,
         [CreatedDate] [datetime] NOT NULL DEFAULT GETDATE(),
         CONSTRAINT [PK_MonitoredFiles] PRIMARY KEY CLUSTERED ([ID] ASC)
@@ -317,55 +319,39 @@ BEGIN
 END
 GO
 
-/****** Object:  Table [dbo].[FileVersions] ******/
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[FileVersions]') AND type in (N'U'))
+
+
+/****** Object:  Table [dbo].[MonitoredFileAlerts] ******/
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[MonitoredFileAlerts]') AND type in (N'U'))
 BEGIN
-    CREATE TABLE [dbo].[FileVersions](
+    CREATE TABLE [dbo].[MonitoredFileAlerts](
         [ID] [uniqueidentifier] NOT NULL,
         [MonitoredFileID] [uniqueidentifier] NOT NULL,
-        [VersionNo] [int] NOT NULL,
-        [ChangeType] [nvarchar](50) NOT NULL,
-        [FileSize] [nvarchar](100) NULL,
-        [FileHash] [nvarchar](max) NULL,
-        [DetectedDate] [datetime] NOT NULL DEFAULT GETDATE(),
-        CONSTRAINT [PK_FileVersions] PRIMARY KEY CLUSTERED ([ID] ASC)
-    )
 
-    ALTER TABLE [dbo].[FileVersions] WITH CHECK ADD CONSTRAINT [FK_FileVersions_MonitoredFiles]
-        FOREIGN KEY([MonitoredFileID]) REFERENCES [dbo].[MonitoredFiles] ([ID])
-END
-GO
-
-/****** Object:  Table [dbo].[FileContents] ******/
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[FileContents]') AND type in (N'U'))
-BEGIN
-    CREATE TABLE [dbo].[FileContents](
-        [ID] [uniqueidentifier] NOT NULL,
-        [FileVersionID] [uniqueidentifier] NOT NULL,
-        [FileData] [varbinary](max) NOT NULL,
+        [AlertType] [nvarchar](50) NOT NULL,
+        [Message] [nvarchar](500) NOT NULL,
+        [IsAcknowledged] [bit] NOT NULL DEFAULT 0,
+        [AcknowledgedDate] [datetime] NULL,
+        [AcknowledgedBy] [nvarchar](100) NULL,
+        [IsCleared] [bit] NOT NULL DEFAULT 0,
         [CreatedDate] [datetime] NOT NULL DEFAULT GETDATE(),
-        CONSTRAINT [PK_FileContents] PRIMARY KEY CLUSTERED ([ID] ASC)
+        [ClearedDate] [datetime] NULL,
+        [ClearedBy] [nvarchar](100) NULL,
+        CONSTRAINT [PK_MonitoredFileAlerts] PRIMARY KEY CLUSTERED ([ID] ASC)
     )
 
-    ALTER TABLE [dbo].[FileContents] WITH CHECK ADD CONSTRAINT [FK_FileContents_FileVersions]
-        FOREIGN KEY([FileVersionID]) REFERENCES [dbo].[FileVersions] ([ID])
-END
-GO
+    ALTER TABLE [dbo].[MonitoredFileAlerts] WITH CHECK ADD CONSTRAINT [FK_MonitoredFileAlerts_MonitoredFiles]
+        FOREIGN KEY([MonitoredFileID]) REFERENCES [dbo].[MonitoredFiles] ([ID])
 
-/****** Object:  Table [dbo].[ScanLogs] ******/
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[ScanLogs]') AND type in (N'U'))
-BEGIN
-    CREATE TABLE [dbo].[ScanLogs](
-        [ID] [uniqueidentifier] NOT NULL,
-        [DirectoryID] [uniqueidentifier] NOT NULL,
-        [ScanDate] [datetime] NOT NULL DEFAULT GETDATE(),
-        [FilesScanned] [int] NOT NULL,
-        [ChangesDetected] [int] NOT NULL,
-        [Status] [nvarchar](50) NOT NULL,
-        CONSTRAINT [PK_ScanLogs] PRIMARY KEY CLUSTERED ([ID] ASC)
-    )
 
-    ALTER TABLE [dbo].[ScanLogs] WITH CHECK ADD CONSTRAINT [FK_ScanLogs_MonitoredDirectories]
-        FOREIGN KEY([DirectoryID]) REFERENCES [dbo].[MonitoredDirectories] ([ID])
+
+    CREATE INDEX [IX_MonitoredFileAlerts_MonitoredFileID] 
+        ON [dbo].[MonitoredFileAlerts]([MonitoredFileID])
+
+    CREATE INDEX [IX_MonitoredFileAlerts_CreatedDate] 
+        ON [dbo].[MonitoredFileAlerts]([CreatedDate] DESC)
+
+    CREATE INDEX [IX_MonitoredFileAlerts_IsCleared] 
+        ON [dbo].[MonitoredFileAlerts]([IsCleared])
 END
 GO

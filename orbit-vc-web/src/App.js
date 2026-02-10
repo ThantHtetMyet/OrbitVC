@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { Login, SignUp, Forgot } from './Pages/User';
 import { DeviceList, DeviceForm, DeviceDetails, DeviceMonitoredFiles } from './Pages/Device';
+import MonitoredFileAlerts from './Pages/Alerts/MonitoredFileAlerts';
 import './App.css';
 
 // Layout component for authenticated pages
@@ -67,12 +68,12 @@ const Layout = ({ children }) => {
             <span className="nav-label">Dashboard</span>
           </Link>
           <Link
-            to="/settings"
-            className={`nav-item ${isActive('/settings') ? 'active' : ''}`}
-            title="Settings"
+            to="/alerts"
+            className={`nav-item ${isActive('/alerts') ? 'active' : ''}`}
+            title="Alerts"
           >
-            <span className="nav-icon">⚙️</span>
-            <span className="nav-label">Settings</span>
+            <span className="nav-icon">⚠️</span>
+            <span className="nav-label">Alerts</span>
           </Link>
         </nav>
         <div className="sidebar-footer">
@@ -110,18 +111,7 @@ const Dashboard = () => (
   </div>
 );
 
-// Simple Settings placeholder component
-const Settings = () => (
-  <div style={{
-    padding: '40px',
-    color: '#fff',
-  }}>
-    <h1>⚙️ Settings</h1>
-    <p style={{ color: 'rgba(255,255,255,0.7)', marginTop: '16px' }}>
-      System settings and configuration options will appear here.
-    </p>
-  </div>
-);
+
 
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
@@ -150,10 +140,10 @@ function App() {
         />
 
         <Route
-          path="/settings"
+          path="/alerts"
           element={
             <ProtectedRoute>
-              <Settings />
+              <MonitoredFileAlerts />
             </ProtectedRoute>
           }
         />

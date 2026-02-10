@@ -361,6 +361,31 @@ class ApiService {
     async deleteMonitoredFile(id) {
         return await this.delete(`/FileControl/files/${id}`);
     }
+
+    // ============================================
+    // Alert API Methods
+    // ============================================
+
+    /**
+     * Get all monitored file alerts
+     */
+    async getAllAlerts() {
+        return await this.get('/FileControl/alerts');
+    }
+
+    /**
+     * Acknowledge an alert
+     */
+    async acknowledgeAlert(id, acknowledgedBy) {
+        return await this.put(`/FileControl/alerts/${id}/acknowledge?acknowledgedBy=${encodeURIComponent(acknowledgedBy)}`, {});
+    }
+
+    /**
+     * Clear an alert
+     */
+    async clearAlert(id, clearedBy) {
+        return await this.put(`/FileControl/alerts/${id}/clear?clearedBy=${encodeURIComponent(clearedBy)}`, {});
+    }
 }
 
 const apiService = new ApiService();

@@ -107,9 +107,9 @@ namespace orbit_vc_api.Repositories
 
             const string sql = @"
                 INSERT INTO MonitoredFiles 
-                (ID, MonitoredDirectoryID, FilePath, FileName, FileSize, FileHash, LastScan, IsDeleted, CreatedDate)
+                (ID, MonitoredDirectoryID, FilePath, FileName, FileSize, FileHash, LastScan, FileDateModified, StoredDirectory, IsDeleted, CreatedDate)
                 VALUES 
-                (@ID, @MonitoredDirectoryID, @FilePath, @FileName, @FileSize, @FileHash, @LastScan, @IsDeleted, @CreatedDate)";
+                (@ID, @MonitoredDirectoryID, @FilePath, @FileName, @FileSize, @FileHash, @LastScan, @FileDateModified, @StoredDirectory, @IsDeleted, @CreatedDate)";
 
             await connection.ExecuteAsync(sql, file);
             return file.ID;
@@ -124,7 +124,9 @@ namespace orbit_vc_api.Repositories
                     FileName = @FileName,
                     FileSize = @FileSize,
                     FileHash = @FileHash,
-                    LastScan = @LastScan
+                    LastScan = @LastScan,
+                    FileDateModified = @FileDateModified,
+                    StoredDirectory = @StoredDirectory
                 WHERE ID = @ID AND IsDeleted = 0";
 
             var rowsAffected = await connection.ExecuteAsync(sql, file);
@@ -141,93 +143,78 @@ namespace orbit_vc_api.Repositories
 
         #endregion
 
-        #region File Version & Content
 
-        public async Task<IEnumerable<FileVersion>> GetFileVersionsAsync(Guid fileId)
+
+        #region MonitoredFileAlert
+
+        public async Task<IEnumerable<MonitoredFileAlert>> GetMonitoredFileAlertsAsync(Guid fileId)
         {
             using var connection = CreateConnection();
-            const string sql = "SELECT * FROM FileVersion WHERE MonitoredFileID = @FileId ORDER BY VersionNo DESC";
-            // Note: Assuming table name 'FileVersion' based on screenshot, but could be 'FileVersions'. 
-            // Sticking to 'FileVersion' as per user input/schema if I strictly followed, 
-            // but for safe measure I will use 'FileVersions' assuming consistency with 'MonitoredFiles'.
-            // Actually, screenshot header says 'FileVersion'. 
-            // Devices -> Devices. MonitoredDirectory -> MonitoredDirectories.
-            // I'll stick to 'FileVersions' to be consistent. 
-            // If it fails, user can correct.
-            return await connection.QueryAsync<FileVersion>("SELECT * FROM FileVersions WHERE MonitoredFileID = @FileId ORDER BY VersionNo DESC", new { FileId = fileId });
+            const string sql = "SELECT * FROM MonitoredFileAlerts WHERE MonitoredFileID = @FileId ORDER BY CreatedDate DESC";
+            return await connection.QueryAsync<MonitoredFileAlert>(sql, new { FileId = fileId });
         }
 
-        public async Task<FileVersion?> GetFileVersionByIdAsync(Guid id)
+        public async Task<IEnumerable<MonitoredFileAlert>> GetAllMonitoredFileAlertsAsync()
         {
             using var connection = CreateConnection();
-            return await connection.QuerySingleOrDefaultAsync<FileVersion>("SELECT * FROM FileVersions WHERE ID = @Id", new { Id = id });
+            const string sql = "SELECT * FROM MonitoredFileAlerts ORDER BY CreatedDate DESC";
+            return await connection.QueryAsync<MonitoredFileAlert>(sql);
         }
 
-        public async Task<Guid> CreateFileVersionAsync(FileVersion version)
+        public async Task<MonitoredFileAlert?> GetMonitoredFileAlertByIdAsync(Guid id)
         {
             using var connection = CreateConnection();
-            version.ID = Guid.NewGuid();
-            version.DetectedDate = DateTime.UtcNow;
-            
-            const string sql = @"
-                INSERT INTO FileVersions 
-                (ID, MonitoredFileID, VersionNo, ChangeType, FileSize, FileHash, DetectedDate)
-                VALUES 
-                (@ID, @MonitoredFileID, @VersionNo, @ChangeType, @FileSize, @FileHash, @DetectedDate)";
-
-            await connection.ExecuteAsync(sql, version);
-            return version.ID;
+            const string sql = "SELECT * FROM MonitoredFileAlerts WHERE ID = @Id";
+            return await connection.QuerySingleOrDefaultAsync<MonitoredFileAlert>(sql, new { Id = id });
         }
 
-        public async Task<FileContent?> GetFileContentByVersionIdAsync(Guid versionId)
+        public async Task<Guid> CreateMonitoredFileAlertAsync(MonitoredFileAlert alert)
         {
             using var connection = CreateConnection();
-            // Assuming FileContents table
-            return await connection.QuerySingleOrDefaultAsync<FileContent>("SELECT * FROM FileContents WHERE FileVersionID = @VersionId", new { VersionId = versionId });
-        }
-
-        public async Task<Guid> CreateFileContentAsync(FileContent content)
-        {
-            using var connection = CreateConnection();
-            content.ID = Guid.NewGuid();
-            content.CreatedDate = DateTime.UtcNow;
+            alert.ID = Guid.NewGuid();
+            alert.CreatedDate = DateTime.UtcNow;
+            alert.IsAcknowledged = false;
+            alert.IsCleared = false;
 
             const string sql = @"
-                INSERT INTO FileContents 
-                (ID, FileVersionID, FileData, CreatedDate)
+                INSERT INTO MonitoredFileAlerts 
+                (ID, MonitoredFileID, AlertType, Message, IsAcknowledged, AcknowledgedDate, AcknowledgedBy, IsCleared, CreatedDate, ClearedDate, ClearedBy)
                 VALUES 
-                (@ID, @FileVersionID, @FileData, @CreatedDate)";
+                (@ID, @MonitoredFileID, @AlertType, @Message, @IsAcknowledged, @AcknowledgedDate, @AcknowledgedBy, @IsCleared, @CreatedDate, @ClearedDate, @ClearedBy)";
 
-            await connection.ExecuteAsync(sql, content);
-            return content.ID;
+            await connection.ExecuteAsync(sql, alert);
+            return alert.ID;
         }
 
-        #endregion
-
-        #region Scan Log
-
-        public async Task<IEnumerable<ScanLog>> GetScanLogsAsync(Guid directoryId)
+        public async Task<bool> AcknowledgeMonitoredFileAlertAsync(Guid id, string acknowledgedBy)
         {
             using var connection = CreateConnection();
-            return await connection.QueryAsync<ScanLog>("SELECT * FROM ScanLogs WHERE DirectoryID = @DirectoryId ORDER BY ScanDate DESC", new { DirectoryId = directoryId });
-        }
-
-        public async Task<Guid> CreateScanLogAsync(ScanLog log)
-        {
-            using var connection = CreateConnection();
-            log.ID = Guid.NewGuid();
-            log.ScanDate = DateTime.UtcNow;
-
             const string sql = @"
-                INSERT INTO ScanLogs 
-                (ID, DirectoryID, ScanDate, FilesScanned, ChangesDetected, Status)
-                VALUES 
-                (@ID, @DirectoryID, @ScanDate, @FilesScanned, @ChangesDetected, @Status)";
+                UPDATE MonitoredFileAlerts 
+                SET IsAcknowledged = 1,
+                    AcknowledgedDate = @AcknowledgedDate,
+                    AcknowledgedBy = @AcknowledgedBy
+                WHERE ID = @Id AND IsAcknowledged = 0";
 
-            await connection.ExecuteAsync(sql, log);
-            return log.ID;
+            var rowsAffected = await connection.ExecuteAsync(sql, new { Id = id, AcknowledgedDate = DateTime.UtcNow, AcknowledgedBy = acknowledgedBy });
+            return rowsAffected > 0;
+        }
+
+        public async Task<bool> ClearMonitoredFileAlertAsync(Guid id, string clearedBy)
+        {
+            using var connection = CreateConnection();
+            const string sql = @"
+                UPDATE MonitoredFileAlerts 
+                SET IsCleared = 1,
+                    ClearedDate = @ClearedDate,
+                    ClearedBy = @ClearedBy
+                WHERE ID = @Id AND IsCleared = 0";
+
+            var rowsAffected = await connection.ExecuteAsync(sql, new { Id = id, ClearedDate = DateTime.UtcNow, ClearedBy = clearedBy });
+            return rowsAffected > 0;
         }
 
         #endregion
     }
 }
+
