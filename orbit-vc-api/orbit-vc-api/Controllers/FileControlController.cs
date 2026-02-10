@@ -4,8 +4,11 @@ using System.IO;
 using System.Diagnostics;
 using System.Text.Json;
 using orbit_vc_api.Models;
+using orbit_vc_api.Models.DTOs;
 using orbit_vc_api.Repositories.Interfaces;
 using orbit_vc_api.Services;
+using Microsoft.AspNetCore.Http;
+using System.Security.Cryptography;
 
 namespace orbit_vc_api.Controllers
 {
@@ -33,98 +36,7 @@ namespace orbit_vc_api.Controllers
             _configuration = configuration;
         }
 
-        #region MonitoredDirectory
 
-        [HttpGet("directories/device/{deviceId}")]
-        public async Task<ActionResult<IEnumerable<MonitoredDirectory>>> GetDirectoriesByDevice(Guid deviceId)
-        {
-            try
-            {
-                var directories = await _repository.GetMonitoredDirectoriesByDeviceIdAsync(deviceId);
-                return Ok(directories);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("System", "GET_DIRECTORIES_ERROR", $"Failed to get directories for device {deviceId}", ex);
-                return StatusCode(500, "Internal server error");
-            }
-        }
-
-
-
-        [HttpGet("directories/{id}")]
-        public async Task<ActionResult<MonitoredDirectory>> GetDirectory(Guid id)
-        {
-            var directory = await _repository.GetMonitoredDirectoryByIdAsync(id);
-            if (directory == null) return NotFound();
-            return Ok(directory);
-        }
-
-        [HttpPost("directories")]
-        public async Task<ActionResult<Guid>> CreateDirectory(MonitoredDirectory directory)
-        {
-            try
-            {
-                var id = await _repository.CreateMonitoredDirectoryAsync(directory);
-                return Ok(id);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("System", "CREATE_DIRECTORY_ERROR", "Failed to create directory", ex);
-                return StatusCode(500, "Internal server error");
-            }
-        }
-
-        [HttpPut("directories")]
-        public async Task<ActionResult> UpdateDirectory(MonitoredDirectory directory)
-        {
-            try
-            {
-                var result = await _repository.UpdateMonitoredDirectoryAsync(directory);
-                if (!result) return NotFound();
-                return NoContent();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("System", "UPDATE_DIRECTORY_ERROR", "Failed to update directory", ex);
-                return StatusCode(500, "Internal server error");
-            }
-        }
-
-        [HttpDelete("directories/{id}")]
-        public async Task<ActionResult> DeleteDirectory(Guid id)
-        {
-            try
-            {
-                var result = await _repository.DeleteMonitoredDirectoryAsync(id);
-                if (!result) return NotFound();
-                return NoContent();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("System", "DELETE_DIRECTORY_ERROR", "Failed to delete directory", ex);
-                return StatusCode(500, "Internal server error");
-            }
-        }
-
-        #endregion
-
-        #region MonitoredFile
-
-        [HttpGet("files/directory/{directoryId}")]
-        public async Task<ActionResult<IEnumerable<MonitoredFile>>> GetFilesByDirectory(Guid directoryId)
-        {
-            try
-            {
-                var files = await _repository.GetMonitoredFilesAsync(directoryId);
-                return Ok(files);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("System", "GET_FILES_ERROR", $"Failed to get files for directory {directoryId}", ex);
-                return StatusCode(500, "Internal server error");
-            }
-        }
 
         [HttpGet("files/{id}")]
         public async Task<ActionResult<MonitoredFile>> GetFile(Guid id)
@@ -134,29 +46,33 @@ namespace orbit_vc_api.Controllers
             return Ok(file);
         }
 
+        [HttpGet("files/{id}/versions")]
+        public async Task<ActionResult<IEnumerable<MonitoredFileVersion>>> GetFileVersions(Guid id)
+        {
+            var versions = await _repository.GetMonitoredFileVersionsAsync(id);
+            return Ok(versions);
+        }
+
         public class CreateFileRequest
         {
-            public Guid MonitoredDirectoryID { get; set; }
-            public string FilePath { get; set; } = string.Empty;
+            public Guid DeviceID { get; set; }
+            public string DirectoryPath { get; set; } = string.Empty;
             public string FileName { get; set; } = string.Empty;
         }
 
         [HttpPost("files")]
         public async Task<ActionResult<Guid>> CreateFile(CreateFileRequest input)
         {
-            if (string.IsNullOrEmpty(input.FilePath) || string.IsNullOrEmpty(input.FileName))
-                return BadRequest("FilePath and FileName are required");
+            if (string.IsNullOrEmpty(input.DirectoryPath) || string.IsNullOrEmpty(input.FileName))
+                return BadRequest("DirectoryPath and FileName are required");
 
             try
             {
-                var directory = await _repository.GetMonitoredDirectoryByIdAsync(input.MonitoredDirectoryID);
-                if (directory == null) return NotFound("Directory not found");
-
-                // Get IP
-                var device = await _deviceRepository.GetDeviceByIdAsync(directory.DeviceID);
+                // Get Device
+                var device = await _deviceRepository.GetByIdAsync(input.DeviceID);
                 if (device == null) return BadRequest("Device not found");
                 
-                var ipAddresses = await _deviceRepository.GetDeviceIPAddressesAsync(device.ID);
+                var ipAddresses = await _deviceRepository.GetIPAddressesByDeviceIdAsync(device.ID);
                 string? targetIp = ipAddresses.FirstOrDefault(ip => ip.IPAddress.StartsWith("10.") || ip.IPAddress.StartsWith("192."))?.IPAddress 
                                 ?? ipAddresses.FirstOrDefault()?.IPAddress;
 
@@ -165,18 +81,21 @@ namespace orbit_vc_api.Controllers
                 var parent = new MonitoredFile
                 {
                     ID = Guid.NewGuid(),
-                    MonitoredDirectoryID = input.MonitoredDirectoryID,
+                    DeviceID = input.DeviceID,
                     LastScan = DateTime.UtcNow,
                     IsDeleted = false,
                     CreatedDate = DateTime.UtcNow
                 };
+
+                var fullPath = Path.Combine(input.DirectoryPath, input.FileName);
 
                 var version = new MonitoredFileVersion
                 {
                     ID = Guid.NewGuid(),
                     MonitoredFileID = parent.ID,
                     VersionNo = 1,
-                    FilePath = input.FilePath,
+                    ParentDirectory = input.DirectoryPath,
+                    AbsoluteDirectory = fullPath,
                     FileName = input.FileName,
                     IsDeleted = false,
                     CreatedDate = DateTime.UtcNow,
@@ -186,8 +105,6 @@ namespace orbit_vc_api.Controllers
 
                 // Scan Logic
                 {
-                    var fullPath = Path.Combine(directory.DirectoryPath, input.FileName);
-                    
                     // Determine local destination path for copy
                     string? destPath = null;
                     var storedFilesPath = _configuration["StoredFilesPath"];
@@ -250,6 +167,96 @@ namespace orbit_vc_api.Controllers
             }
         }
 
+        [HttpPost("files/{id}/versions")]
+        public async Task<ActionResult<Guid>> UploadFileVersion(
+            Guid id, 
+            IFormFile file,
+            [FromForm] string? fileName,
+            [FromForm] string? directoryPath)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest("File is empty");
+
+            try
+            {
+                // Get Parent
+                var parent = await _repository.GetMonitoredFileByIdAsync(id);
+                if (parent == null) return NotFound("Monitored File not found");
+
+                // Get Latest Version to retrieve current ParentDirectory if not provided
+                var currentLatest = await _repository.GetLatestFileVersionAsync(id);
+                string currentParentDir = currentLatest?.ParentDirectory ?? string.Empty;
+
+                string effectiveFileName = !string.IsNullOrWhiteSpace(fileName) ? fileName : file.FileName;
+                string effectiveParentDir = !string.IsNullOrWhiteSpace(directoryPath) ? directoryPath : currentParentDir;
+
+                if (string.IsNullOrEmpty(effectiveParentDir)) return BadRequest("Directory path unknown");
+
+                // Get Latest Version Number
+                var latest = await _repository.GetLatestFileVersionAsync(id);
+                int nextVer = (latest?.VersionNo ?? 0) + 1;
+
+                // Prepare Storage Path
+                var storedFilesPath = _configuration["StoredFilesPath"];
+                if (string.IsNullOrEmpty(storedFilesPath))
+                    return StatusCode(500, "StoredFilesPath not configured");
+
+                var verPath = Path.Combine(storedFilesPath, parent.ID.ToString(), $"Version-{nextVer}");
+                if (!Directory.Exists(verPath)) Directory.CreateDirectory(verPath);
+
+                var localFilePath = Path.Combine(verPath, effectiveFileName);
+
+                // Save File
+                using (var stream = new FileStream(localFilePath, FileMode.Create))
+                {
+                    await file.CopyToAsync(stream);
+                }
+
+                // Calculate Hash/Size
+                var fileInfo = new FileInfo(localFilePath);
+                string hash;
+                using (var sha256 = SHA256.Create())
+                {
+                    using (var stream = System.IO.File.OpenRead(localFilePath))
+                    {
+                        var hashBytes = sha256.ComputeHash(stream);
+                        hash = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+                    }
+                }
+
+                // Create Version Record
+                var version = new MonitoredFileVersion
+                {
+                    ID = Guid.NewGuid(),
+                    MonitoredFileID = parent.ID,
+                    VersionNo = nextVer,
+                    AbsoluteDirectory = Path.Combine(effectiveParentDir, effectiveFileName),
+                    FileName = effectiveFileName,
+                    ParentDirectory = effectiveParentDir,
+                    FileSize = fileInfo.Length.ToString(),
+                    FileHash = hash,
+                    FileDateModified = DateTime.UtcNow,
+                    DetectedDate = DateTime.UtcNow,
+                    StoredDirectory = localFilePath,
+                    IsDeleted = false,
+                    CreatedDate = DateTime.UtcNow
+                };
+
+                await _repository.CreateMonitoredFileVersionAsync(version);
+
+                // Update Parent LastScan
+                parent.LastScan = DateTime.UtcNow;
+                await _repository.UpdateMonitoredFileAsync(parent);
+
+                return Ok(version.ID);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("System", "UPLOAD_FILE_VERSION_ERROR", "Failed to upload file version", ex);
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
         [HttpPut("files")]
         public async Task<ActionResult> UpdateFile(MonitoredFile file)
         {
@@ -282,18 +289,18 @@ namespace orbit_vc_api.Controllers
             }
         }
 
-        #endregion
+
 
 
 
         #region MonitoredFileAlert
 
         [HttpGet("alerts")]
-        public async Task<ActionResult<IEnumerable<MonitoredFileAlert>>> GetAllAlerts()
+        public async Task<ActionResult<IEnumerable<AlertDetailDto>>> GetAllAlerts()
         {
             try
             {
-                var alerts = await _repository.GetAllMonitoredFileAlertsAsync();
+                var alerts = await _repository.GetAllAlertsWithDetailsAsync();
                 return Ok(alerts);
             }
             catch (Exception ex)

@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } f
 import { Login, SignUp, Forgot } from './Pages/User';
 import { DeviceList, DeviceForm, DeviceDetails, DeviceMonitoredFiles } from './Pages/Device';
 import MonitoredFileAlerts from './Pages/Alerts/MonitoredFileAlerts';
+import MonitoredFileDetails from './Pages/MonitoredFiles/MonitoredFileDetails';
 import './App.css';
 
 // Layout component for authenticated pages
@@ -186,6 +187,14 @@ function App() {
           element={
             <ProtectedRoute>
               <DeviceMonitoredFiles />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/monitored-files/:id"
+          element={
+            <ProtectedRoute>
+              <MonitoredFileDetails />
             </ProtectedRoute>
           }
         />

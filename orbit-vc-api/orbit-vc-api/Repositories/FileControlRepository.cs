@@ -4,6 +4,7 @@ using Dapper;
 using Microsoft.Data.SqlClient;
 using orbit_vc_api.Models;
 using orbit_vc_api.Repositories.Interfaces;
+using orbit_vc_api.Models.DTOs;
 
 namespace orbit_vc_api.Repositories
 {
@@ -19,76 +20,57 @@ namespace orbit_vc_api.Repositories
 
         private IDbConnection CreateConnection() => new SqlConnection(_connectionString);
 
-        #region Monitored Directory
 
-        public async Task<IEnumerable<MonitoredDirectory>> GetMonitoredDirectoriesAsync()
-        {
-            using var connection = CreateConnection();
-            const string sql = "SELECT * FROM MonitoredDirectories WHERE IsDeleted = 0 ORDER BY DirectoryPath";
-            return await connection.QueryAsync<MonitoredDirectory>(sql);
-        }
 
-        public async Task<MonitoredDirectory?> GetMonitoredDirectoryByIdAsync(Guid id)
-        {
-            using var connection = CreateConnection();
-            const string sql = "SELECT * FROM MonitoredDirectories WHERE ID = @Id AND IsDeleted = 0";
-            return await connection.QuerySingleOrDefaultAsync<MonitoredDirectory>(sql, new { Id = id });
-        }
 
-        public async Task<IEnumerable<MonitoredDirectory>> GetMonitoredDirectoriesByDeviceIdAsync(Guid deviceId)
-        {
-            using var connection = CreateConnection();
-            const string sql = "SELECT * FROM MonitoredDirectories WHERE DeviceID = @DeviceId AND IsDeleted = 0 ORDER BY DirectoryPath";
-            return await connection.QueryAsync<MonitoredDirectory>(sql, new { DeviceId = deviceId });
-        }
 
-        public async Task<Guid> CreateMonitoredDirectoryAsync(MonitoredDirectory directory)
-        {
-            using var connection = CreateConnection();
-            directory.ID = Guid.NewGuid();
-            directory.CreatedDate = DateTime.UtcNow;
-            directory.IsDeleted = false;
-            
-            const string sql = @"
-                INSERT INTO MonitoredDirectories 
-                (ID, DeviceID, DirectoryPath, IsActive, CreatedDate, IsDeleted)
-                VALUES 
-                (@ID, @DeviceID, @DirectoryPath, @IsActive, @CreatedDate, @IsDeleted)";
 
-            await connection.ExecuteAsync(sql, directory);
-            return directory.ID;
-        }
 
-        public async Task<bool> UpdateMonitoredDirectoryAsync(MonitoredDirectory directory)
-        {
-            using var connection = CreateConnection();
-            const string sql = @"
-                UPDATE MonitoredDirectories 
-                SET DirectoryPath = @DirectoryPath,
-                    IsActive = @IsActive
-                WHERE ID = @ID AND IsDeleted = 0";
 
-            var rowsAffected = await connection.ExecuteAsync(sql, directory);
-            return rowsAffected > 0;
-        }
 
-        public async Task<bool> DeleteMonitoredDirectoryAsync(Guid id)
-        {
-            using var connection = CreateConnection();
-            const string sql = "UPDATE MonitoredDirectories SET IsDeleted = 1 WHERE ID = @Id";
-            var rowsAffected = await connection.ExecuteAsync(sql, new { Id = id });
-            return rowsAffected > 0;
-        }
 
-        #endregion
+
+
+
+
+
+
 
         #region Monitored File
 
-        public async Task<IEnumerable<MonitoredFile>> GetMonitoredFilesAsync(Guid directoryId)
+        public async Task<IEnumerable<MonitoredFile>> GetMonitoredFilesByDeviceAsync(Guid deviceId)
         {
             using var connection = CreateConnection();
-            const string sql = "SELECT * FROM MonitoredFiles WHERE MonitoredDirectoryID = @DirectoryId AND IsDeleted = 0 ORDER BY FileName";
-            return await connection.QueryAsync<MonitoredFile>(sql, new { DirectoryId = directoryId });
+            const string sql = "SELECT * FROM MonitoredFiles WHERE DeviceID = @DeviceId AND IsDeleted = 0 ORDER BY CreatedDate DESC";
+            return await connection.QueryAsync<MonitoredFile>(sql, new { DeviceId = deviceId });
+        }
+
+        public async Task<IEnumerable<MonitoredFileDetailDto>> GetMonitoredFileDetailsByDeviceAsync(Guid deviceId)
+        {
+            using var connection = CreateConnection();
+            const string sql = @"
+                SELECT 
+                    mf.ID, 
+                    mf.DeviceID, 
+                    mf.LastScan, 
+                    v.FileName, 
+                    v.ParentDirectory, 
+                    v.AbsoluteDirectory, 
+                    v.FileSize, 
+                    v.FileHash, 
+                    v.FileDateModified, 
+                    v.StoredDirectory, 
+                    v.VersionNo
+                FROM MonitoredFiles mf
+                JOIN MonitoredFileVersions v ON mf.ID = v.MonitoredFileID
+                WHERE mf.DeviceID = @DeviceId AND mf.IsDeleted = 0
+                AND v.VersionNo = (
+                    SELECT MAX(VersionNo) 
+                    FROM MonitoredFileVersions 
+                    WHERE MonitoredFileID = mf.ID
+                )
+                ORDER BY v.FileName";
+            return await connection.QueryAsync<MonitoredFileDetailDto>(sql, new { DeviceId = deviceId });
         }
 
         public async Task<MonitoredFile?> GetMonitoredFileByIdAsync(Guid id)
@@ -110,9 +92,9 @@ namespace orbit_vc_api.Repositories
 
             const string sql = @"
                 INSERT INTO MonitoredFiles 
-                (ID, MonitoredDirectoryID, LastScan, IsDeleted, CreatedDate)
+                (ID, DeviceID, LastScan, IsDeleted, CreatedDate)
                 VALUES 
-                (@ID, @MonitoredDirectoryID, @LastScan, @IsDeleted, @CreatedDate)";
+                (@ID, @DeviceID, @LastScan, @IsDeleted, @CreatedDate)";
 
             await connection.ExecuteAsync(sql, file);
             return file.ID;
@@ -147,9 +129,9 @@ namespace orbit_vc_api.Repositories
 
             const string sql = @"
                 INSERT INTO MonitoredFileVersions 
-                (ID, MonitoredFileID, VersionNo, FileDateModified, FileSize, FileHash, DetectedDate, StoredDirectory, FilePath, FileName, IsDeleted, CreatedDate)
+                (ID, MonitoredFileID, VersionNo, FileDateModified, FileSize, FileHash, DetectedDate, StoredDirectory, AbsoluteDirectory, FileName, ParentDirectory, IsDeleted, CreatedDate)
                 VALUES 
-                (@ID, @MonitoredFileID, @VersionNo, @FileDateModified, @FileSize, @FileHash, @DetectedDate, @StoredDirectory, @FilePath, @FileName, @IsDeleted, @CreatedDate)";
+                (@ID, @MonitoredFileID, @VersionNo, @FileDateModified, @FileSize, @FileHash, @DetectedDate, @StoredDirectory, @AbsoluteDirectory, @FileName, @ParentDirectory, @IsDeleted, @CreatedDate)";
 
             await connection.ExecuteAsync(sql, version);
             return version.ID;
@@ -165,6 +147,32 @@ namespace orbit_vc_api.Repositories
                 ORDER BY VersionNo DESC";
             
             return await connection.QuerySingleOrDefaultAsync<MonitoredFileVersion>(sql, new { FileId = fileId });
+        }
+
+        public async Task<IEnumerable<MonitoredFileVersion>> GetMonitoredFileVersionsAsync(Guid fileId)
+        {
+            using var connection = CreateConnection();
+            const string sql = @"
+                SELECT *
+                FROM MonitoredFileVersions
+                WHERE MonitoredFileID = @FileId
+                ORDER BY VersionNo DESC";
+
+            return await connection.QueryAsync<MonitoredFileVersion>(sql, new { FileId = fileId });
+        }
+
+        public async Task<IEnumerable<string>> GetUniqueDirectoriesByDeviceAsync(Guid deviceId)
+        {
+            using var connection = CreateConnection();
+            const string sql = @"
+                SELECT DISTINCT v.ParentDirectory
+                FROM MonitoredFileVersions v
+                JOIN MonitoredFiles mf ON v.MonitoredFileID = mf.ID
+                WHERE mf.DeviceID = @DeviceId AND mf.IsDeleted = 0
+                AND v.ParentDirectory IS NOT NULL AND v.ParentDirectory <> ''
+                ORDER BY v.ParentDirectory";
+
+            return await connection.QueryAsync<string>(sql, new { DeviceId = deviceId });
         }
 
         #endregion
@@ -185,6 +193,37 @@ namespace orbit_vc_api.Repositories
             using var connection = CreateConnection();
             const string sql = "SELECT * FROM MonitoredFileAlerts ORDER BY CreatedDate DESC";
             return await connection.QueryAsync<MonitoredFileAlert>(sql);
+        }
+
+        public async Task<IEnumerable<AlertDetailDto>> GetAllAlertsWithDetailsAsync()
+        {
+            using var connection = CreateConnection();
+            const string sql = @"
+                SELECT
+                    a.ID,
+                    a.MonitoredFileID,
+                    a.AlertType,
+                    a.Message,
+                    a.IsAcknowledged,
+                    a.AcknowledgedDate,
+                    a.AcknowledgedBy,
+                    a.IsCleared,
+                    a.CreatedDate,
+                    a.ClearedDate,
+                    a.ClearedBy,
+                    v.FileName,
+                    v.ParentDirectory AS DirectoryPath,
+                    v.AbsoluteDirectory AS FilePath,
+                    mf.DeviceID,
+                    d.Name AS DeviceName
+                FROM MonitoredFileAlerts a
+                JOIN MonitoredFiles mf ON a.MonitoredFileID = mf.ID
+                LEFT JOIN Devices d ON mf.DeviceID = d.ID
+                LEFT JOIN MonitoredFileVersions v ON mf.ID = v.MonitoredFileID
+                    AND v.VersionNo = (SELECT MAX(VersionNo) FROM MonitoredFileVersions WHERE MonitoredFileID = mf.ID)
+                ORDER BY a.CreatedDate DESC";
+
+            return await connection.QueryAsync<AlertDetailDto>(sql);
         }
 
         public async Task<MonitoredFileAlert?> GetMonitoredFileAlertByIdAsync(Guid id)

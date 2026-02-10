@@ -236,6 +236,13 @@ class ApiService {
     }
 
     /**
+     * Get unique directories for a device
+     */
+    async getDeviceDirectories(id) {
+        return await this.get(`/Device/${id}/directories`);
+    }
+
+    /**
      * Create a new device
      */
     async createDevice(deviceData) {
@@ -292,53 +299,51 @@ class ApiService {
     // FileControl API Methods (Monitored Directories & Files)
     // ============================================
 
-    /**
-     * Get monitored directories by device ID
-     */
-    async getMonitoredDirectoriesByDevice(deviceId) {
-        return await this.get(`/FileControl/directories/device/${deviceId}`);
-    }
 
-    /**
-     * Get monitored directory by ID
-     */
-    async getMonitoredDirectoryById(id) {
-        return await this.get(`/FileControl/directories/${id}`);
-    }
 
-    /**
-     * Create a new monitored directory
-     */
-    async createMonitoredDirectory(directoryData) {
-        return await this.post('/FileControl/directories', directoryData);
-    }
 
-    /**
-     * Update a monitored directory
-     */
-    async updateMonitoredDirectory(directoryData) {
-        return await this.put('/FileControl/directories', directoryData);
-    }
-
-    /**
-     * Delete a monitored directory
-     */
-    async deleteMonitoredDirectory(id) {
-        return await this.delete(`/FileControl/directories/${id}`);
-    }
-
-    /**
-     * Get monitored files by directory ID
-     */
-    async getMonitoredFilesByDirectory(directoryId) {
-        return await this.get(`/FileControl/files/directory/${directoryId}`);
-    }
 
     /**
      * Get monitored file by ID
      */
     async getMonitoredFileById(id) {
         return await this.get(`/FileControl/files/${id}`);
+    }
+
+    /**
+     * Get monitored file versions by file ID
+     */
+    async getMonitoredFileVersions(id) {
+        return await this.get(`/FileControl/files/${id}/versions`);
+    }
+
+    /**
+     * Upload a new version for a monitored file
+     */
+    async uploadMonitoredFileVersion(fileId, file, fileName, directoryPath) {
+        const formData = new FormData();
+        formData.append('file', file);
+        if (fileName) formData.append('fileName', fileName);
+        if (directoryPath) formData.append('directoryPath', directoryPath);
+
+        try {
+            const token = localStorage.getItem('authToken');
+            const headers = {};
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            const response = await fetch(`${this.baseUrl}/FileControl/files/${fileId}/versions`, {
+                method: 'POST',
+                headers: headers,
+                body: formData
+            });
+
+            return await this.handleResponse(response);
+        } catch (error) {
+            console.error('Upload file version failed:', error);
+            throw error;
+        }
     }
 
     /**

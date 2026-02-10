@@ -49,20 +49,14 @@ def run(config):
         conn = get_db_connection(config)
         cursor = conn.cursor()
         
-        # 0. Fetch Device IPs (prioritize Network-01)
-        device_ips = {}
-        # Optimization: Query files first, then get IP for each device as needed to avoid fetching all if loop handles it?
-        # But we previously fetched specific IPs inside loop using device_id.
-        # Let's keep logic simple: Query files, loop, query IP per file/device.
-
         # Select files (Join with latest version)
+        # MonitoredDirectories table is gone. Location info is in MonitoredFileVersions.
         cursor.execute("""
-            SELECT 
-                mf.ID, v.FilePath, v.FileName, v.FileHash, v.FileSize, v.StoredDirectory,
-                md.DirectoryPath, md.ID as DirectoryID, md.DeviceID, v.VersionNo
+            SELECT
+                mf.ID, v.AbsoluteDirectory, v.FileName, v.FileHash, v.FileSize, v.StoredDirectory,
+                mf.DeviceID, v.VersionNo, v.ParentDirectory, v.FileDateModified
             FROM MonitoredFiles mf
             JOIN MonitoredFileVersions v ON mf.ID = v.MonitoredFileID
-            JOIN MonitoredDirectories md ON mf.MonitoredDirectoryID = md.ID
             WHERE v.VersionNo = (SELECT MAX(VersionNo) FROM MonitoredFileVersions WHERE MonitoredFileID = mf.ID)
             AND mf.IsDeleted = 0
         """)
@@ -72,15 +66,15 @@ def run(config):
         for row in rows:
             try:
                 file_id = row.ID
-                ver_file_path = row.FilePath
+                abs_directory = row.AbsoluteDirectory
                 file_name = row.FileName
                 old_hash = row.FileHash
                 old_size = row.FileSize
                 stored_dir = row.StoredDirectory
-                directory_path = row.DirectoryPath
-                directory_id = row.DirectoryID
+                parent_dir = row.ParentDirectory
                 device_id = row.DeviceID
                 current_ver_no = row.VersionNo
+                old_file_date_mod = row.FileDateModified
 
                 # Get IP Address (Network-01 preferred)
                 cursor.execute("""
@@ -100,26 +94,64 @@ def run(config):
                     
                 ip_address = ip_row[0]
                 
-                full_path = os.path.join(construct_unc_path(ip_address, directory_path), file_name)
-                
+                # Construct UNC path using AbsoluteDirectory
+                full_path = construct_unc_path(ip_address, abs_directory)
+
                 if not os.path.exists(full_path):
-                    logger.warning(f"File not found: {full_path}")
+                    # File was deleted - create DELETED alert
+                    logger.warning(f"File DELETED or not accessible: {full_path}")
+
+                    # Check if there's already an uncleared DELETED alert for this file
+                    cursor.execute("""
+                        SELECT COUNT(*) FROM MonitoredFileAlerts
+                        WHERE MonitoredFileID = ? AND AlertType = 'DELETED' AND IsCleared = 0
+                    """, (file_id,))
+                    existing_alert = cursor.fetchone()[0]
+
+                    if existing_alert == 0:
+                        # Create DELETED alert
+                        alert_id = uuid.uuid4()
+                        alert_msg = f"File '{file_name}' was deleted or is no longer accessible at path: {abs_directory}"
+                        cursor.execute("""
+                            INSERT INTO MonitoredFileAlerts
+                            (ID, MonitoredFileID, AlertType, Message, CreatedDate, IsAcknowledged, IsCleared)
+                            VALUES (?, ?, 'DELETED', ?, GETDATE(), 0, 0)
+                        """, (alert_id, file_id, alert_msg))
+
+                        # Update LastScan
+                        cursor.execute("UPDATE MonitoredFiles SET LastScan = GETDATE() WHERE ID = ?", (file_id,))
+                        conn.commit()
+                        logger.info(f"Created DELETED alert for {file_name}")
+                    else:
+                        logger.info(f"DELETED alert already exists for {file_name}, skipping duplicate alert")
                     continue
-                    
+
                 current_hash = compute_file_hash(full_path)
                 file_size_bytes = os.path.getsize(full_path)
                 file_size_str = str(file_size_bytes)
                 mtime = os.path.getmtime(full_path)
                 file_date_mod = datetime.fromtimestamp(mtime)
-                
-                # Check for modification
-                if old_hash != current_hash:
+
+                # Check for modification (hash change or FileDateModified change)
+                hash_changed = old_hash != current_hash
+                date_changed = False
+                if old_file_date_mod:
+                    # Compare dates (allow 1 second tolerance for filesystem differences)
+                    date_diff = abs((file_date_mod - old_file_date_mod).total_seconds())
+                    date_changed = date_diff > 1
+
+                if hash_changed or date_changed:
                     change_type = 'MODIFIED' if old_hash else 'CREATED'
-                    logger.info(f"File {change_type}: {full_path}")
-                    
-                    # Create Alert
+                    logger.info(f"File {change_type}: {full_path} (hash_changed={hash_changed}, date_changed={date_changed})")
+
+                    # Create Alert with detailed message
                     alert_id = uuid.uuid4()
-                    alert_msg = f"File {file_name} was {change_type.lower()}."
+                    if hash_changed and date_changed:
+                        alert_msg = f"File '{file_name}' was {change_type.lower()}. Content and modification date changed."
+                    elif hash_changed:
+                        alert_msg = f"File '{file_name}' was {change_type.lower()}. Content (hash) changed."
+                    else:
+                        alert_msg = f"File '{file_name}' was {change_type.lower()}. Modification date changed."
                     cursor.execute("""
                         INSERT INTO MonitoredFileAlerts 
                         (ID, MonitoredFileID, AlertType, Message, CreatedDate, IsAcknowledged, IsCleared)
@@ -150,14 +182,12 @@ def run(config):
 
                     # Insert New Version
                     new_ver_id = uuid.uuid4()
-                    # We use ver_file_path (original input path) for the new version too? Or full_path?
-                    # The schema says "FilePath". Let's use ver_file_path (user defined path) to be consistent.
                     cursor.execute("""
                         INSERT INTO MonitoredFileVersions 
-                        (ID, MonitoredFileID, VersionNo, FileDateModified, FileSize, FileHash, DetectedDate, StoredDirectory, FilePath, FileName, IsDeleted, CreatedDate)
+                        (ID, MonitoredFileID, VersionNo, FileDateModified, FileSize, FileHash, DetectedDate, StoredDirectory, AbsoluteDirectory, FileName, ParentDirectory, IsDeleted, CreatedDate)
                         VALUES 
-                        (?, ?, ?, ?, ?, ?, GETDATE(), ?, ?, ?, 0, GETDATE())
-                    """, (new_ver_id, file_id, next_ver, file_date_mod, file_size_str, current_hash, new_stored_path, ver_file_path if ver_file_path else '', file_name))
+                        (?, ?, ?, ?, ?, ?, GETDATE(), ?, ?, ?, ?, 0, GETDATE())
+                    """, (new_ver_id, file_id, next_ver, file_date_mod, file_size_str, current_hash, new_stored_path, abs_directory, file_name, parent_dir))
 
                     # Update MonitoredFile LastScan
                     cursor.execute("""

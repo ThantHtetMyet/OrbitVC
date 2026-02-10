@@ -3,24 +3,24 @@ import { useNavigate, useParams } from 'react-router-dom';
 import apiService from '../../services/api-service';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import Modal from '../../components/Modal';
+import MonitoredFilesList from '../MonitoredFiles/MonitoredFilesList';
+import MonitoredFilesForm from '../MonitoredFiles/MonitoredFilesForm';
+import MonitoredFilesEditForm from '../MonitoredFiles/MonitoredFilesEditForm';
 import './Device.css';
 
 const DeviceMonitoredFiles = () => {
     const navigate = useNavigate();
     const { id } = useParams();
     const [device, setDevice] = useState(null);
-    const [loading, setLoading] = useState(true);
     const [monitoredFiles, setMonitoredFiles] = useState([]);
     const [directories, setDirectories] = useState([]);
 
-    // Modal states
-    const [showFileModal, setShowFileModal] = useState(false);
+    const [loading, setLoading] = useState(true);
+
+
+    // View State
+    const [viewMode, setViewMode] = useState('list'); // 'list', 'add', 'edit'
     const [editingFile, setEditingFile] = useState(null);
-    const [fileForm, setFileForm] = useState({
-        directoryPath: '',
-        fileName: '',
-        existingDirectoryId: ''
-    });
 
     // Alert modal
     const [modalConfig, setModalConfig] = useState({
@@ -31,60 +31,40 @@ const DeviceMonitoredFiles = () => {
         onConfirm: null
     });
 
-    const fetchDevice = useCallback(async () => {
+    const fetchDeviceData = useCallback(async () => {
+        setLoading(true);
         try {
-            const data = await apiService.getDeviceById(id);
-            setDevice(data);
+            const [deviceData, filesData, directoriesData] = await Promise.all([
+                apiService.getDeviceById(id),
+                apiService.getDeviceMonitoredFiles(id),
+                apiService.getDeviceDirectories(id)
+            ]);
+            setDevice(deviceData);
+            setMonitoredFiles(filesData);
+            setDirectories(directoriesData.map((path, index) => ({ id: `dir-${index}`, directoryPath: path })));
         } catch (error) {
-            console.error('Error fetching device:', error);
-        }
-    }, [id]);
-
-    const fetchMonitoredFiles = useCallback(async () => {
-        try {
-            const data = await apiService.getDeviceMonitoredFiles(id);
-            setMonitoredFiles(data);
-        } catch (error) {
-            console.error('Error fetching monitored files:', error);
-        }
-    }, [id]);
-
-    const fetchDirectories = useCallback(async () => {
-        try {
-            const data = await apiService.getMonitoredDirectoriesByDevice(id);
-            setDirectories(data);
-        } catch (error) {
-            console.error('Error fetching directories:', error);
+            console.error('Error fetching data:', error);
+            showModal('Error', 'Failed to load device data', 'error');
+        } finally {
+            setLoading(false);
         }
     }, [id]);
 
     useEffect(() => {
-        const loadData = async () => {
-            setLoading(true);
-            await Promise.all([fetchDevice(), fetchMonitoredFiles(), fetchDirectories()]);
-            setLoading(false);
-        };
-        loadData();
-    }, [fetchDevice, fetchMonitoredFiles, fetchDirectories]);
+        fetchDeviceData();
+    }, [fetchDeviceData]);
 
     const handleBack = () => {
-        navigate(`/devices/${id}`);
+        if (viewMode !== 'list') {
+            setViewMode('list');
+            setEditingFile(null);
+        } else {
+            navigate('/devices');
+        }
     };
 
-    const formatFileSize = (bytes) => {
-        if (!bytes) return '-';
-        const numBytes = parseFloat(bytes);
-        if (isNaN(numBytes) || numBytes === 0) return '-';
-
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-        const i = Math.floor(Math.log(numBytes) / Math.log(k));
-
-        if (i < 0) return numBytes + ' Bytes';
-        // Ensure i is within bounds (though improbable with log)
-        const sizeIndex = Math.min(i, sizes.length - 1);
-
-        return parseFloat((numBytes / Math.pow(k, sizeIndex)).toFixed(2)) + ' ' + sizes[sizeIndex];
+    const handleEditDevice = () => {
+        navigate(`/devices/${id}/edit`);
     };
 
     const showModal = (title, message, type = 'info', onConfirm = null) => {
@@ -95,73 +75,62 @@ const DeviceMonitoredFiles = () => {
         setModalConfig(prev => ({ ...prev, isOpen: false }));
     };
 
-    // File CRUD handlers
+    // CRUD Handlers
     const handleAddFile = () => {
         setEditingFile(null);
-        setFileForm({
-            directoryPath: '',
-            fileName: '',
-            existingDirectoryId: ''
-        });
-        setShowFileModal(true);
+        setViewMode('add');
     };
 
     const handleEditFile = (file) => {
         setEditingFile(file);
-        const directory = directories.find(d => d.id === file.monitoredDirectoryID);
-        setFileForm({
-            directoryPath: directory?.directoryPath || file.directoryPath || '',
-            fileName: file.fileName,
-            existingDirectoryId: file.monitoredDirectoryID || ''
-        });
-        setShowFileModal(true);
+        setViewMode('edit');
     };
 
-    const handleSaveFile = async () => {
-        if (!fileForm.directoryPath.trim() || !fileForm.fileName.trim()) {
+    const handleViewDetails = (file) => {
+        navigate(`/monitored-files/${file.id}`);
+    };
+
+    const handleCancelForm = () => {
+        setEditingFile(null);
+        setViewMode('list');
+    };
+
+    const handleSaveFile = async (formData) => {
+        if (!formData.directoryPath.trim() || !formData.fileName.trim()) {
             showModal('Error', 'Please enter both directory path and file name', 'error');
             return;
         }
 
         try {
-            let directoryId = fileForm.existingDirectoryId;
+            await apiService.createMonitoredFile({
+                deviceID: id,
+                directoryPath: formData.directoryPath.trim(),
+                fileName: formData.fileName.trim()
+            });
+            showModal('Success', 'Monitored file added successfully', 'success');
 
-            // Check if we need to create a new directory
-            const existingDir = directories.find(d =>
-                d.directoryPath.toLowerCase() === fileForm.directoryPath.trim().toLowerCase()
-            );
-
-            if (existingDir) {
-                directoryId = existingDir.id;
-            } else {
-                // Create new directory
-                directoryId = await apiService.createMonitoredDirectory({
-                    deviceID: id,
-                    directoryPath: fileForm.directoryPath.trim()
-                });
-            }
-
-            if (editingFile) {
-                await apiService.updateMonitoredFile({
-                    id: editingFile.id,
-                    monitoredDirectoryID: directoryId,
-                    filePath: `${fileForm.directoryPath.trim()}\\${fileForm.fileName.trim()}`,
-                    fileName: fileForm.fileName.trim()
-                });
-                showModal('Success', 'Monitored file updated successfully', 'success');
-            } else {
-                await apiService.createMonitoredFile({
-                    monitoredDirectoryID: directoryId,
-                    filePath: `${fileForm.directoryPath.trim()}\\${fileForm.fileName.trim()}`,
-                    fileName: fileForm.fileName.trim()
-                });
-                showModal('Success', 'Monitored file added successfully', 'success');
-            }
-            setShowFileModal(false);
-            fetchMonitoredFiles();
-            fetchDirectories();
+            setViewMode('list');
+            fetchDeviceData(); // Refresh all data
         } catch (error) {
             showModal('Error', 'Failed to save monitored file', 'error');
+        }
+    };
+
+    const handleUploadVersion = async (formData) => {
+        try {
+            await apiService.uploadMonitoredFileVersion(
+                editingFile.id,
+                formData.file,
+                formData.fileName,
+                formData.directoryPath.trim()
+            );
+
+            showModal('Success', 'New version uploaded successfully', 'success');
+            setViewMode('list');
+            setEditingFile(null);
+            fetchDeviceData();
+        } catch (error) {
+            showModal('Error', 'Failed to upload new version', 'error');
         }
     };
 
@@ -174,7 +143,7 @@ const DeviceMonitoredFiles = () => {
                 try {
                     await apiService.deleteMonitoredFile(file.id);
                     showModal('Success', 'Monitored file deleted successfully', 'success');
-                    fetchMonitoredFiles();
+                    fetchDeviceData();
                 } catch (error) {
                     showModal('Error', 'Failed to delete monitored file', 'error');
                 }
@@ -182,43 +151,13 @@ const DeviceMonitoredFiles = () => {
         );
     };
 
-    const handleDirectorySelect = (e) => {
-        const selectedId = e.target.value;
-        if (selectedId === 'new') {
-            setFileForm({ ...fileForm, existingDirectoryId: '', directoryPath: '' });
-        } else {
-            const dir = directories.find(d => d.id === selectedId);
-            setFileForm({
-                ...fileForm,
-                existingDirectoryId: selectedId,
-                directoryPath: dir?.directoryPath || ''
-            });
-        }
-    };
+    const filteredFiles = monitoredFiles;
 
-    if (loading) {
-        return <LoadingSpinner fullScreen={true} size="small" />;
-    }
-
-    if (!device) {
-        return (
-            <div className="device-container">
-                <div className="device-header">
-                    <button className="btn-back" onClick={() => navigate('/devices')}>
-                        ← Back to Devices
-                    </button>
-                </div>
-                <div className="not-found">
-                    <h2>Device not found</h2>
-                    <p>The device you're looking for doesn't exist or has been deleted.</p>
-                </div>
-            </div>
-        );
-    }
+    if (loading) return <LoadingSpinner fullScreen={true} size="small" />;
+    if (!device) return <div className="not-found">Device not found</div>;
 
     return (
-        <div className="device-container">
-            {/* Alert Modal */}
+        <div className="monitored-files-container">
             <Modal
                 isOpen={modalConfig.isOpen}
                 onClose={closeModal}
@@ -228,128 +167,60 @@ const DeviceMonitoredFiles = () => {
                 onConfirm={modalConfig.onConfirm}
             />
 
-            {/* File Modal */}
-            {showFileModal && (
-                <div className="modal-overlay" onClick={() => setShowFileModal(false)}>
-                    <div className="modal-content crud-modal" onClick={e => e.stopPropagation()}>
-                        <h2>{editingFile ? 'Edit Monitored File' : 'Add Monitored File'}</h2>
+            <div className="device-header">
+                <button className="btn-back" onClick={handleBack}>
+                    {viewMode !== 'list' ? '← Back to List' : '← Back to Devices'}
+                </button>
+                <div className="header-actions">
+                    <button className="btn-primary" onClick={handleEditDevice}>
+                        ✏️ Edit Device
+                    </button>
+                </div>
+            </div>
 
-                        {/* Directory Selection */}
-                        {directories.length > 0 && !editingFile && (
-                            <div className="form-group">
-                                <label>Select Existing Directory (Optional)</label>
-                                <select
-                                    value={fileForm.existingDirectoryId}
-                                    onChange={handleDirectorySelect}
-                                >
-                                    <option value="new">-- Enter New Directory --</option>
-                                    {directories.map(dir => (
-                                        <option key={dir.id} value={dir.id}>{dir.directoryPath}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        )}
+            <h2 className="page-title">Monitored Files: {device.name}</h2>
 
-                        <div className="form-group">
-                            <label>Directory Path</label>
-                            <input
-                                type="text"
-                                value={fileForm.directoryPath}
-                                onChange={e => setFileForm({ ...fileForm, directoryPath: e.target.value })}
-                                placeholder="e.g., C:\Logs\Application"
-                                disabled={fileForm.existingDirectoryId && !editingFile}
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label>File Name</label>
-                            <input
-                                type="text"
-                                value={fileForm.fileName}
-                                onChange={e => setFileForm({ ...fileForm, fileName: e.target.value })}
-                                placeholder="e.g., application.log"
-                            />
-                        </div>
-                        <div className="modal-actions">
-                            <button className="btn-secondary" onClick={() => setShowFileModal(false)}>
-                                Cancel
-                            </button>
-                            <button className="btn-primary" onClick={handleSaveFile}>
-                                {editingFile ? 'Update' : 'Add'}
-                            </button>
-                        </div>
+            {viewMode === 'list' && (
+                <>
+                    <div className="files-controls">
+
+                        <button className="btn-primary" onClick={handleAddFile}>
+                            + Add File
+                        </button>
                     </div>
+
+                    <div className="files-table-container">
+                        <MonitoredFilesList
+                            monitoredFiles={filteredFiles}
+                            onEdit={handleEditFile}
+                            onDelete={handleDeleteFile}
+                            onViewDetails={handleViewDetails}
+                        />
+                    </div>
+                </>
+            )}
+
+            {viewMode === 'add' && (
+                <div className="simple-card">
+                    <MonitoredFilesForm
+                        onCancel={handleCancelForm}
+                        onSave={handleSaveFile}
+                        editingFile={null}
+                        directories={directories}
+                    />
                 </div>
             )}
 
-            {/* Header */}
-            <div className="device-header detail-header">
-                <button className="btn-back" onClick={handleBack}>
-                    ← Back to Device
-                </button>
-            </div>
-
-            {/* Page Title */}
-            <div className="device-title-card">
-                <div className="device-title-text">
-                    <h1 className="device-title-name">Monitored Files</h1>
-                    <span className="device-title-hostname">{device.name}</span>
+            {viewMode === 'edit' && (
+                <div className="simple-card">
+                    <MonitoredFilesEditForm
+                        onCancel={handleCancelForm}
+                        onSave={handleUploadVersion}
+                        editingFile={editingFile}
+                        directories={directories}
+                    />
                 </div>
-                <button className="btn-primary" onClick={handleAddFile}>
-                    + Add File
-                </button>
-            </div>
-
-            {/* Files Table */}
-            <div className="simple-card">
-                {monitoredFiles.length > 0 ? (
-                    <table className="simple-table data-table">
-                        <thead>
-                            <tr>
-                                <th>Directory</th>
-                                <th>File Name</th>
-                                <th>File Size</th>
-                                <th>Last Scan</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {monitoredFiles.map(file => (
-                                <tr key={file.id}>
-                                    <td className="path-cell">{file.directoryPath}</td>
-                                    <td>{file.fileName}</td>
-                                    <td>{formatFileSize(file.fileSize)}</td>
-                                    <td>
-                                        {file.lastScan
-                                            ? new Date(file.lastScan).toLocaleString()
-                                            : 'Never'}
-                                    </td>
-                                    <td className="actions-cell">
-                                        <button
-                                            className="btn-icon btn-edit"
-                                            onClick={() => handleEditFile(file)}
-                                            title="Edit"
-                                        >
-                                            ✏️
-                                        </button>
-                                        <button
-                                            className="btn-icon btn-delete"
-                                            onClick={() => handleDeleteFile(file)}
-                                            title="Delete"
-                                        >
-                                            🗑️
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                ) : (
-                    <div className="empty-state">
-                        <p className="empty-message">No monitored files configured</p>
-                        <p className="empty-hint">Click "Add File" to start monitoring files on this device.</p>
-                    </div>
-                )}
-            </div>
+            )}
         </div>
     );
 };

@@ -124,22 +124,16 @@ namespace orbit_vc_api.Controllers
         {
             try
             {
-                var directories = await _fileControlRepository.GetMonitoredDirectoriesByDeviceIdAsync(id);
-                var result = new List<DeviceMonitoredFileDto>();
-
-                foreach (var dir in directories)
+                var files = await _fileControlRepository.GetMonitoredFileDetailsByDeviceAsync(id);
+                var result = files.Select(f => new DeviceMonitoredFileDto
                 {
-                    var files = await _fileControlRepository.GetMonitoredFilesAsync(dir.ID);
-                    result.AddRange(files.Select(f => new DeviceMonitoredFileDto
-                    {
-                        ID = f.ID,
-                        DirectoryPath = dir.DirectoryPath,
-                        FilePath = f.FilePath,
-                        FileName = f.FileName,
-                        FileSize = f.FileSize,
-                        LastScan = f.LastScan
-                    }));
-                }
+                    ID = f.ID,
+                    DirectoryPath = f.ParentDirectory,
+                    FilePath = f.AbsoluteDirectory,
+                    FileName = f.FileName,
+                    FileSize = f.FileSize,
+                    LastScan = f.LastScan
+                }).ToList();
 
                 _logger.LogActivity("User viewed Device Monitored Files", $"Retrieved {result.Count} monitored files for device {id}");
                 return Ok(result);
@@ -148,6 +142,24 @@ namespace orbit_vc_api.Controllers
             {
                 _logger.LogError("System", "DEVICE_FILES_ERROR", $"Failed to fetch monitored files for device {id}", ex);
                 return StatusCode(500, new { message = "An error occurred while fetching monitored files" });
+            }
+        }
+
+        /// <summary>
+        /// Get unique directories for a device (from monitored file versions)
+        /// </summary>
+        [HttpGet("{id}/directories")]
+        public async Task<ActionResult<IEnumerable<string>>> GetUniqueDirectories(Guid id)
+        {
+            try
+            {
+                var directories = await _fileControlRepository.GetUniqueDirectoriesByDeviceAsync(id);
+                return Ok(directories);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("System", "DEVICE_DIRECTORIES_ERROR", $"Failed to fetch directories for device {id}", ex);
+                return StatusCode(500, new { message = "An error occurred while fetching directories" });
             }
         }
 

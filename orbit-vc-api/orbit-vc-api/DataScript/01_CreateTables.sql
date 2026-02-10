@@ -278,42 +278,26 @@ GO
 -- FILE CONTROL TABLES
 -- =============================================
 
-/****** Object:  Table [dbo].[MonitoredDirectories] ******/
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[MonitoredDirectories]') AND type in (N'U'))
-BEGIN
-    CREATE TABLE [dbo].[MonitoredDirectories](
-        [ID] [uniqueidentifier] NOT NULL,
-        [DeviceID] [uniqueidentifier] NOT NULL,
-        [DirectoryPath] [nvarchar](500) NOT NULL,
-        [IsActive] [bit] NOT NULL,
-        [CreatedDate] [datetime] NOT NULL DEFAULT GETDATE(),
-        [IsDeleted] [bit] NOT NULL DEFAULT 0,
-        CONSTRAINT [PK_MonitoredDirectories] PRIMARY KEY CLUSTERED ([ID] ASC)
-    )
 
-    ALTER TABLE [dbo].[MonitoredDirectories] WITH CHECK ADD CONSTRAINT [FK_MonitoredDirectories_Devices]
-        FOREIGN KEY([DeviceID]) REFERENCES [dbo].[Devices] ([ID])
-END
-GO
 
 /****** Object:  Table [dbo].[MonitoredFiles] ******/
 IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[MonitoredFiles]') AND type in (N'U'))
 BEGIN
     CREATE TABLE [dbo].[MonitoredFiles](
         [ID] [uniqueidentifier] NOT NULL,
-        [MonitoredDirectoryID] [uniqueidentifier] NOT NULL,
+        [DeviceID] [uniqueidentifier] NOT NULL,
         [LastScan] [datetime] NULL,
         [IsDeleted] [bit] NOT NULL DEFAULT 0,
         [CreatedDate] [datetime] NOT NULL DEFAULT GETDATE(),
         CONSTRAINT [PK_MonitoredFiles] PRIMARY KEY CLUSTERED ([ID] ASC)
     )
 
-    IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[FK_MonitoredFiles_MonitoredDirectories]') AND parent_object_id = OBJECT_ID(N'[dbo].[MonitoredFiles]'))
-    ALTER TABLE [dbo].[MonitoredFiles]  WITH CHECK ADD  CONSTRAINT [FK_MonitoredFiles_MonitoredDirectories] FOREIGN KEY([MonitoredDirectoryID])
-    REFERENCES [dbo].[MonitoredDirectories] ([ID])
+    IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[FK_MonitoredFiles_Devices]') AND parent_object_id = OBJECT_ID(N'[dbo].[MonitoredFiles]'))
+    ALTER TABLE [dbo].[MonitoredFiles]  WITH CHECK ADD  CONSTRAINT [FK_MonitoredFiles_Devices] FOREIGN KEY([DeviceID])
+    REFERENCES [dbo].[Devices] ([ID])
     ON DELETE CASCADE
 
-    ALTER TABLE [dbo].[MonitoredFiles] CHECK CONSTRAINT [FK_MonitoredFiles_MonitoredDirectories]
+    ALTER TABLE [dbo].[MonitoredFiles] CHECK CONSTRAINT [FK_MonitoredFiles_Devices]
 END
 GO
 
@@ -329,8 +313,9 @@ BEGIN
         [FileHash] [nvarchar](max) NULL,
         [DetectedDate] [datetime] NOT NULL DEFAULT GETDATE(),
         [StoredDirectory] [nvarchar](max) NOT NULL DEFAULT '',
-        [FilePath] [nvarchar](500) NOT NULL,
+        [AbsoluteDirectory] [nvarchar](500) NOT NULL,
         [FileName] [nvarchar](500) NOT NULL,
+        [ParentDirectory] [nvarchar](max) NOT NULL,
         [IsDeleted] [bit] NOT NULL DEFAULT 0,
         [CreatedDate] [datetime] NOT NULL DEFAULT GETDATE(),
         CONSTRAINT [PK_MonitoredFileVersions] PRIMARY KEY CLUSTERED ([ID] ASC)

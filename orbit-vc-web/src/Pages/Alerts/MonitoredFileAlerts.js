@@ -104,6 +104,8 @@ const MonitoredFileAlerts = () => {
                             <tr>
                                 <th>Date/Time</th>
                                 <th>Type</th>
+                                <th>Device</th>
+                                <th>File</th>
                                 <th>Message</th>
                                 <th>Status</th>
                                 <th>Actions</th>
@@ -112,13 +114,34 @@ const MonitoredFileAlerts = () => {
                         <tbody>
                             {alerts.map(alert => (
                                 <tr key={alert.id} className={alert.isCleared ? 'row-cleared' : (alert.isAcknowledged ? 'row-ack' : 'row-new')}>
-                                    <td>{new Date(alert.createdDate).toLocaleString()}</td>
+                                    <td style={{ whiteSpace: 'nowrap' }}>{new Date(alert.createdDate).toLocaleString()}</td>
                                     <td>
-                                        <span className={`status-badge ${alert.alertType === 'MODIFIED' ? 'status-warning' : 'status-info'}`}>
+                                        <span className={`status-badge ${alert.alertType === 'DELETED' ? 'status-error' : alert.alertType === 'MODIFIED' ? 'status-warning' : 'status-info'}`}>
                                             {alert.alertType}
                                         </span>
                                     </td>
-                                    <td>{alert.message}</td>
+                                    <td>
+                                        {alert.deviceName ? (
+                                            <span
+                                                className="link-text"
+                                                onClick={() => navigate(`/devices/${alert.deviceID}`)}
+                                                style={{ cursor: 'pointer', color: '#4fc3f7' }}
+                                            >
+                                                {alert.deviceName}
+                                            </span>
+                                        ) : '-'}
+                                    </td>
+                                    <td>
+                                        <div style={{ fontSize: '13px' }}>
+                                            <strong>{alert.fileName || '-'}</strong>
+                                            {alert.directoryPath && (
+                                                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>
+                                                    {alert.directoryPath}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td style={{ maxWidth: '300px' }}>{alert.message}</td>
                                     <td>
                                         {alert.isCleared ? (
                                             <span className="status-badge status-success">Cleared</span>
