@@ -48,37 +48,55 @@ def run(config):
     try:
         conn = get_db_connection(config)
         cursor = conn.cursor()
-        
-        # Select files (Join with latest version)
-        # MonitoredDirectories table is gone. Location info is in MonitoredFileVersions.
+
+        # Get all monitored files with their latest version info
+        # First check MonitoredFileChangeHistory, fall back to MonitoredFileVersions
         cursor.execute("""
             SELECT
-                mf.ID, v.AbsoluteDirectory, v.FileName, v.FileHash, v.FileSize, v.StoredDirectory,
-                mf.DeviceID, v.VersionNo, v.ParentDirectory, v.FileDateModified
+                mf.ID,
+                mf.DeviceID,
+                v.ID AS MonitoredFileVersionID,
+                COALESCE(ch.AbsoluteDirectory, v.AbsoluteDirectory) AS AbsoluteDirectory,
+                COALESCE(ch.FileName, v.FileName) AS FileName,
+                COALESCE(ch.FileHash, v.FileHash) AS FileHash,
+                COALESCE(ch.FileSize, v.FileSize) AS FileSize,
+                COALESCE(ch.ParentDirectory, v.ParentDirectory) AS ParentDirectory,
+                COALESCE(ch.FileDateModified, v.FileDateModified) AS FileDateModified,
+                COALESCE(ch.VersionNo, 0) AS ChangeHistoryVersionNo
             FROM MonitoredFiles mf
-            JOIN MonitoredFileVersions v ON mf.ID = v.MonitoredFileID
-            WHERE v.VersionNo = (SELECT MAX(VersionNo) FROM MonitoredFileVersions WHERE MonitoredFileID = mf.ID)
-            AND mf.IsDeleted = 0
+            LEFT JOIN MonitoredFileVersions v ON mf.ID = v.MonitoredFileID
+                AND v.VersionNo = (SELECT MAX(VersionNo) FROM MonitoredFileVersions WHERE MonitoredFileID = mf.ID)
+            LEFT JOIN MonitoredFileChangeHistory ch ON mf.ID = ch.MonitoredFileID
+                AND ch.VersionNo = (SELECT MAX(VersionNo) FROM MonitoredFileChangeHistory WHERE MonitoredFileID = mf.ID)
+            WHERE mf.IsDeleted = 0
         """)
-        
+
         rows = cursor.fetchall()
-        
+
         for row in rows:
             try:
                 file_id = row.ID
+                device_id = row.DeviceID
+                monitored_file_version_id = row.MonitoredFileVersionID
                 abs_directory = row.AbsoluteDirectory
                 file_name = row.FileName
                 old_hash = row.FileHash
                 old_size = row.FileSize
-                stored_dir = row.StoredDirectory
                 parent_dir = row.ParentDirectory
-                device_id = row.DeviceID
-                current_ver_no = row.VersionNo
                 old_file_date_mod = row.FileDateModified
+                change_history_ver_no = row.ChangeHistoryVersionNo or 0
 
-                # Get IP Address (Network-01 preferred)
+                if not abs_directory or not file_name:
+                    logger.warning(f"Missing file info for MonitoredFile {file_id}, skipping")
+                    continue
+
+                if not monitored_file_version_id:
+                    logger.warning(f"Missing MonitoredFileVersionID for MonitoredFile {file_id}, skipping")
+                    continue
+
+                # Get IP Address (prefer internal IPs)
                 cursor.execute("""
-                    SELECT ip.IPAddress 
+                    SELECT ip.IPAddress
                     FROM DeviceIPAddresses ip
                     LEFT JOIN IPAddressTypes ipt ON ip.IPAddressTypeID = ipt.ID
                     WHERE ip.DeviceID = ? AND (ip.IPAddress LIKE '10.%' OR ip.IPAddress LIKE '192.%')
@@ -87,13 +105,13 @@ def run(config):
                 if not ip_row:
                     cursor.execute("SELECT TOP 1 IPAddress FROM DeviceIPAddresses WHERE DeviceID = ?", device_id)
                     ip_row = cursor.fetchone()
-                
+
                 if not ip_row:
                     logger.warning(f"No IP found for device {device_id}, skipping {file_name}")
                     continue
-                    
+
                 ip_address = ip_row[0]
-                
+
                 # Construct UNC path using AbsoluteDirectory
                 full_path = construct_unc_path(ip_address, abs_directory)
 
@@ -132,75 +150,65 @@ def run(config):
                 mtime = os.path.getmtime(full_path)
                 file_date_mod = datetime.fromtimestamp(mtime)
 
-                # Check for modification (hash change or FileDateModified change)
+                # Check for modification (hash change only)
                 hash_changed = old_hash != current_hash
-                date_changed = False
-                if old_file_date_mod:
-                    # Compare dates (allow 1 second tolerance for filesystem differences)
-                    date_diff = abs((file_date_mod - old_file_date_mod).total_seconds())
-                    date_changed = date_diff > 1
 
-                if hash_changed or date_changed:
+                if hash_changed:
                     change_type = 'MODIFIED' if old_hash else 'CREATED'
-                    logger.info(f"File {change_type}: {full_path} (hash_changed={hash_changed}, date_changed={date_changed})")
+                    logger.info(f"File {change_type}: {full_path} (hash_changed={hash_changed})")
 
                     # Create Alert with detailed message
                     alert_id = uuid.uuid4()
-                    if hash_changed and date_changed:
-                        alert_msg = f"File '{file_name}' was {change_type.lower()}. Content and modification date changed."
-                    elif hash_changed:
-                        alert_msg = f"File '{file_name}' was {change_type.lower()}. Content (hash) changed."
-                    else:
-                        alert_msg = f"File '{file_name}' was {change_type.lower()}. Modification date changed."
+                    alert_msg = f"File '{file_name}' was {change_type.lower()}. Content (hash) changed."
                     cursor.execute("""
-                        INSERT INTO MonitoredFileAlerts 
+                        INSERT INTO MonitoredFileAlerts
                         (ID, MonitoredFileID, AlertType, Message, CreatedDate, IsAcknowledged, IsCleared)
                         VALUES (?, ?, ?, ?, GETDATE(), 0, 0)
                     """, (alert_id, file_id, change_type, alert_msg))
-                    
-                    # Handle File Versioning / Storage
+
+                    # Handle File Storage in MonitoredFileChangeHistory folder
                     stored_files_path = config.get('stored_files_path')
                     new_stored_path = ''
-                    next_ver = current_ver_no + 1
-                    
+                    next_ver = change_history_ver_no + 1
+
                     if stored_files_path:
                         try:
-                            # Base path: stored_files_path/FileID
-                            file_base_path = os.path.join(stored_files_path, str(file_id))
-                            if not os.path.exists(file_base_path):
-                                os.makedirs(file_base_path, exist_ok=True)
-                            
-                            ver_folder = os.path.join(file_base_path, f"Version-{next_ver}")
+                            # Store in: stored_files_path/MonitoredFileChangeHistory/FileID/ChangeHistory-X
+                            change_history_base = os.path.join(stored_files_path, 'MonitoredFileChangeHistory', str(file_id))
+                            if not os.path.exists(change_history_base):
+                                os.makedirs(change_history_base, exist_ok=True)
+
+                            ver_folder = os.path.join(change_history_base, f"ChangeHistory-{next_ver}")
                             os.makedirs(ver_folder, exist_ok=True)
-                            
+
                             dest_path = os.path.join(ver_folder, file_name)
                             shutil.copy2(full_path, dest_path)
                             new_stored_path = dest_path
-                            logger.info(f"Archived version {next_ver} to {new_stored_path}")
+                            logger.info(f"Archived change history version {next_ver} to {new_stored_path}")
                         except Exception as e:
-                            logger.error(f"Failed to archive file version: {str(e)}")
+                            logger.error(f"Failed to archive file change history: {str(e)}")
 
-                    # Insert New Version
-                    new_ver_id = uuid.uuid4()
+                    # Insert into MonitoredFileChangeHistory table (NOT MonitoredFileVersions)
+                    new_history_id = uuid.uuid4()
                     cursor.execute("""
-                        INSERT INTO MonitoredFileVersions 
-                        (ID, MonitoredFileID, VersionNo, FileDateModified, FileSize, FileHash, DetectedDate, StoredDirectory, AbsoluteDirectory, FileName, ParentDirectory, IsDeleted, CreatedDate)
-                        VALUES 
-                        (?, ?, ?, ?, ?, ?, GETDATE(), ?, ?, ?, ?, 0, GETDATE())
-                    """, (new_ver_id, file_id, next_ver, file_date_mod, file_size_str, current_hash, new_stored_path, abs_directory, file_name, parent_dir))
+                        INSERT INTO MonitoredFileChangeHistory
+                        (ID, MonitoredFileID, MonitoredFileVersionID, VersionNo, FileDateModified, FileSize, FileHash, DetectedDate, StoredDirectory, AbsoluteDirectory, FileName, ParentDirectory, IsDeleted, CreatedDate)
+                        VALUES
+                        (?, ?, ?, ?, ?, ?, ?, GETDATE(), ?, ?, ?, ?, 0, GETDATE())
+                    """, (new_history_id, file_id, monitored_file_version_id, next_ver, file_date_mod, file_size_str, current_hash, new_stored_path, abs_directory, file_name, parent_dir))
 
                     # Update MonitoredFile LastScan
                     cursor.execute("""
-                        UPDATE MonitoredFiles 
+                        UPDATE MonitoredFiles
                         SET LastScan = GETDATE()
                         WHERE ID = ?
                     """, (file_id,))
-                    
+
                     conn.commit()
-                    logger.info(f"Processed changes for {file_name} (New Version: {next_ver})")
-                
+                    logger.info(f"Processed changes for {file_name} (Change History Version: {next_ver})")
+
                 else:
-                    # No change
+                    # No change - just update LastScan
                     cursor.execute("UPDATE MonitoredFiles SET LastScan = GETDATE() WHERE ID = ?", file_id)
                     conn.commit()
 

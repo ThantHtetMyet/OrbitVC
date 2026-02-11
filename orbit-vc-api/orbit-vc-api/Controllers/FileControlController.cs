@@ -47,9 +47,9 @@ namespace orbit_vc_api.Controllers
         }
 
         [HttpGet("files/{id}/versions")]
-        public async Task<ActionResult<IEnumerable<MonitoredFileVersion>>> GetFileVersions(Guid id)
+        public async Task<ActionResult<IEnumerable<MonitoredFileVersionDetailDto>>> GetFileVersions(Guid id)
         {
-            var versions = await _repository.GetMonitoredFileVersionsAsync(id);
+            var versions = await _repository.GetMonitoredFileVersionsWithIpAsync(id);
             return Ok(versions);
         }
 
@@ -106,16 +106,17 @@ namespace orbit_vc_api.Controllers
                 // Scan Logic
                 {
                     // Determine local destination path for copy
+                    // User-uploaded files go to: StoredFilesPath/MonitoredFileVersion/FileID/Version-X
                     string? destPath = null;
                     var storedFilesPath = _configuration["StoredFilesPath"];
                     if (!string.IsNullOrEmpty(storedFilesPath))
                     {
-                        try 
+                        try
                         {
-                            var idPath = Path.Combine(storedFilesPath, parent.ID.ToString());
-                            var verPath = Path.Combine(idPath, "Version-1");
+                            var basePath = Path.Combine(storedFilesPath, "MonitoredFileVersion", parent.ID.ToString());
+                            var verPath = Path.Combine(basePath, "Version-1");
                             if (!Directory.Exists(verPath)) Directory.CreateDirectory(verPath);
-                            
+
                             destPath = Path.Combine(verPath, input.FileName);
                         }
                         catch (Exception ex)
@@ -197,11 +198,12 @@ namespace orbit_vc_api.Controllers
                 int nextVer = (latest?.VersionNo ?? 0) + 1;
 
                 // Prepare Storage Path
+                // User-uploaded files go to: StoredFilesPath/MonitoredFileVersion/FileID/Version-X
                 var storedFilesPath = _configuration["StoredFilesPath"];
                 if (string.IsNullOrEmpty(storedFilesPath))
                     return StatusCode(500, "StoredFilesPath not configured");
 
-                var verPath = Path.Combine(storedFilesPath, parent.ID.ToString(), $"Version-{nextVer}");
+                var verPath = Path.Combine(storedFilesPath, "MonitoredFileVersion", parent.ID.ToString(), $"Version-{nextVer}");
                 if (!Directory.Exists(verPath)) Directory.CreateDirectory(verPath);
 
                 var localFilePath = Path.Combine(verPath, effectiveFileName);
@@ -221,6 +223,37 @@ namespace orbit_vc_api.Controllers
                     {
                         var hashBytes = sha256.ComputeHash(stream);
                         hash = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+                    }
+                }
+
+                // Detect what changed compared to previous version
+                bool hashChanged = currentLatest == null || currentLatest.FileHash != hash;
+                bool pathChanged = currentLatest != null &&
+                    (currentLatest.ParentDirectory != effectiveParentDir || currentLatest.FileName != effectiveFileName);
+                bool fileNameChanged = currentLatest != null && currentLatest.FileName != effectiveFileName;
+
+                // Log the type of change
+                if (currentLatest != null)
+                {
+                    if (hashChanged && pathChanged)
+                    {
+                        _logger.LogActivity("File Version Upload", $"Content and path changed for file: {effectiveFileName}");
+                    }
+                    else if (hashChanged)
+                    {
+                        _logger.LogActivity("File Version Upload", $"Content changed for file: {effectiveFileName}");
+                    }
+                    else if (pathChanged)
+                    {
+                        _logger.LogActivity("File Version Upload", $"Path changed (same content) - Old: {currentLatest.ParentDirectory}/{currentLatest.FileName}, New: {effectiveParentDir}/{effectiveFileName}");
+                    }
+                    else if (fileNameChanged)
+                    {
+                        _logger.LogActivity("File Version Upload", $"File renamed from '{currentLatest.FileName}' to '{effectiveFileName}'");
+                    }
+                    else
+                    {
+                        _logger.LogActivity("File Version Upload", $"New version uploaded with same content and path: {effectiveFileName}");
                     }
                 }
 

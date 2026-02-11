@@ -161,6 +161,41 @@ namespace orbit_vc_api.Repositories
             return await connection.QueryAsync<MonitoredFileVersion>(sql, new { FileId = fileId });
         }
 
+        public async Task<IEnumerable<MonitoredFileVersionDetailDto>> GetMonitoredFileVersionsWithIpAsync(Guid fileId)
+        {
+            using var connection = CreateConnection();
+            const string sql = @"
+                SELECT
+                    v.ID,
+                    v.MonitoredFileID,
+                    v.VersionNo,
+                    v.FileDateModified,
+                    v.FileSize,
+                    v.FileHash,
+                    v.DetectedDate,
+                    v.StoredDirectory,
+                    v.AbsoluteDirectory,
+                    v.FileName,
+                    v.ParentDirectory,
+                    COALESCE(
+                        (SELECT TOP 1 ip.IPAddress
+                         FROM DeviceIPAddresses ip
+                         WHERE ip.DeviceID = mf.DeviceID
+                           AND (ip.IPAddress LIKE '10.%' OR ip.IPAddress LIKE '192.%')
+                           AND ip.IsDeleted = 0),
+                        (SELECT TOP 1 ip.IPAddress
+                         FROM DeviceIPAddresses ip
+                         WHERE ip.DeviceID = mf.DeviceID
+                           AND ip.IsDeleted = 0)
+                    ) AS IPAddress
+                FROM MonitoredFileVersions v
+                JOIN MonitoredFiles mf ON v.MonitoredFileID = mf.ID
+                WHERE v.MonitoredFileID = @FileId
+                ORDER BY v.VersionNo DESC";
+
+            return await connection.QueryAsync<MonitoredFileVersionDetailDto>(sql, new { FileId = fileId });
+        }
+
         public async Task<IEnumerable<string>> GetUniqueDirectoriesByDeviceAsync(Guid deviceId)
         {
             using var connection = CreateConnection();
@@ -269,7 +304,7 @@ namespace orbit_vc_api.Repositories
         {
             using var connection = CreateConnection();
             const string sql = @"
-                UPDATE MonitoredFileAlerts 
+                UPDATE MonitoredFileAlerts
                 SET IsCleared = 1,
                     ClearedDate = @ClearedDate,
                     ClearedBy = @ClearedBy
@@ -277,6 +312,48 @@ namespace orbit_vc_api.Repositories
 
             var rowsAffected = await connection.ExecuteAsync(sql, new { Id = id, ClearedDate = DateTime.UtcNow, ClearedBy = clearedBy });
             return rowsAffected > 0;
+        }
+
+        #endregion
+
+        #region MonitoredFileChangeHistory
+
+        public async Task<Guid> CreateChangeHistoryAsync(MonitoredFileChangeHistory history)
+        {
+            using var connection = CreateConnection();
+            if (history.ID == Guid.Empty) history.ID = Guid.NewGuid();
+            history.CreatedDate = DateTime.UtcNow;
+
+            const string sql = @"
+                INSERT INTO MonitoredFileChangeHistory
+                (ID, MonitoredFileID, MonitoredFileVersionID, VersionNo, FileDateModified, FileSize, FileHash, DetectedDate, StoredDirectory, AbsoluteDirectory, FileName, ParentDirectory, IsDeleted, CreatedDate)
+                VALUES
+                (@ID, @MonitoredFileID, @MonitoredFileVersionID, @VersionNo, @FileDateModified, @FileSize, @FileHash, @DetectedDate, @StoredDirectory, @AbsoluteDirectory, @FileName, @ParentDirectory, @IsDeleted, @CreatedDate)";
+
+            await connection.ExecuteAsync(sql, history);
+            return history.ID;
+        }
+
+        public async Task<IEnumerable<MonitoredFileChangeHistory>> GetChangeHistoryByFileAsync(Guid fileId)
+        {
+            using var connection = CreateConnection();
+            const string sql = @"
+                SELECT * FROM MonitoredFileChangeHistory
+                WHERE MonitoredFileID = @FileId
+                ORDER BY VersionNo DESC";
+
+            return await connection.QueryAsync<MonitoredFileChangeHistory>(sql, new { FileId = fileId });
+        }
+
+        public async Task<MonitoredFileChangeHistory?> GetLatestChangeHistoryAsync(Guid fileId)
+        {
+            using var connection = CreateConnection();
+            const string sql = @"
+                SELECT TOP 1 * FROM MonitoredFileChangeHistory
+                WHERE MonitoredFileID = @FileId
+                ORDER BY VersionNo DESC";
+
+            return await connection.QuerySingleOrDefaultAsync<MonitoredFileChangeHistory>(sql, new { FileId = fileId });
         }
 
         #endregion

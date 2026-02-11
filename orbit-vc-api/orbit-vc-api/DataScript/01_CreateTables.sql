@@ -353,15 +353,53 @@ BEGIN
     ALTER TABLE [dbo].[MonitoredFileAlerts] WITH CHECK ADD CONSTRAINT [FK_MonitoredFileAlerts_MonitoredFiles]
         FOREIGN KEY([MonitoredFileID]) REFERENCES [dbo].[MonitoredFiles] ([ID])
 
-
-
-    CREATE INDEX [IX_MonitoredFileAlerts_MonitoredFileID] 
+    CREATE INDEX [IX_MonitoredFileAlerts_MonitoredFileID]
         ON [dbo].[MonitoredFileAlerts]([MonitoredFileID])
 
-    CREATE INDEX [IX_MonitoredFileAlerts_CreatedDate] 
+    CREATE INDEX [IX_MonitoredFileAlerts_CreatedDate]
         ON [dbo].[MonitoredFileAlerts]([CreatedDate] DESC)
 
-    CREATE INDEX [IX_MonitoredFileAlerts_IsCleared] 
+    CREATE INDEX [IX_MonitoredFileAlerts_IsCleared]
         ON [dbo].[MonitoredFileAlerts]([IsCleared])
+END
+GO
+
+/****** Object:  Table [dbo].[MonitoredFileChangeHistory] ******/
+-- Stores file changes detected by Python monitoring script (separate from user-uploaded versions)
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[MonitoredFileChangeHistory]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[MonitoredFileChangeHistory](
+        [ID] [uniqueidentifier] NOT NULL,
+        [MonitoredFileID] [uniqueidentifier] NOT NULL,
+        [MonitoredFileVersionID] [uniqueidentifier] NOT NULL,
+        [VersionNo] [int] NOT NULL,
+        [FileDateModified] [datetime] NOT NULL,
+        [FileSize] [nvarchar](100) NULL,
+        [FileHash] [nvarchar](max) NULL,
+        [DetectedDate] [datetime] NOT NULL DEFAULT GETDATE(),
+        [StoredDirectory] [nvarchar](max) NOT NULL DEFAULT '',
+        [AbsoluteDirectory] [nvarchar](500) NOT NULL,
+        [FileName] [nvarchar](500) NOT NULL,
+        [ParentDirectory] [nvarchar](max) NOT NULL,
+        [IsDeleted] [bit] NOT NULL DEFAULT 0,
+        [CreatedDate] [datetime] NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT [PK_MonitoredFileChangeHistory] PRIMARY KEY CLUSTERED ([ID] ASC)
+    )
+
+    ALTER TABLE [dbo].[MonitoredFileChangeHistory] WITH CHECK ADD CONSTRAINT [FK_MonitoredFileChangeHistory_MonitoredFiles]
+        FOREIGN KEY([MonitoredFileID]) REFERENCES [dbo].[MonitoredFiles] ([ID])
+        ON DELETE CASCADE
+
+    ALTER TABLE [dbo].[MonitoredFileChangeHistory] WITH CHECK ADD CONSTRAINT [FK_MonitoredFileChangeHistory_MonitoredFileVersions]
+        FOREIGN KEY([MonitoredFileVersionID]) REFERENCES [dbo].[MonitoredFileVersions] ([ID])
+
+    CREATE INDEX [IX_MonitoredFileChangeHistory_MonitoredFileID]
+        ON [dbo].[MonitoredFileChangeHistory]([MonitoredFileID])
+
+    CREATE INDEX [IX_MonitoredFileChangeHistory_MonitoredFileVersionID]
+        ON [dbo].[MonitoredFileChangeHistory]([MonitoredFileVersionID])
+
+    CREATE INDEX [IX_MonitoredFileChangeHistory_VersionNo]
+        ON [dbo].[MonitoredFileChangeHistory]([MonitoredFileID], [VersionNo] DESC)
 END
 GO

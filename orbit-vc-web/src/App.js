@@ -1,10 +1,45 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { Login, SignUp, Forgot } from './Pages/User';
 import { DeviceList, DeviceForm, DeviceDetails, DeviceMonitoredFiles } from './Pages/Device';
 import MonitoredFileAlerts from './Pages/Alerts/MonitoredFileAlerts';
 import MonitoredFileDetails from './Pages/MonitoredFiles/MonitoredFileDetails';
+import apiService from './services/api-service';
 import './App.css';
+
+// Glass Icon Components
+const DevicesIcon = () => (
+  <div className="glass-icon glass-icon-green">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+      <line x1="8" y1="21" x2="16" y2="21"></line>
+      <line x1="12" y1="17" x2="12" y2="21"></line>
+    </svg>
+  </div>
+);
+
+const DashboardIcon = () => (
+  <div className="glass-icon glass-icon-blue">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7"></rect>
+      <rect x="14" y="3" width="7" height="7"></rect>
+      <rect x="14" y="14" width="7" height="7"></rect>
+      <rect x="3" y="14" width="7" height="7"></rect>
+    </svg>
+  </div>
+);
+
+const AlertsIcon = ({ count }) => (
+  <div className="glass-icon glass-icon-orange">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+      <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+    </svg>
+    {count > 0 && (
+      <span className="notification-badge">{count > 99 ? '99+' : count}</span>
+    )}
+  </div>
+);
 
 // Layout component for authenticated pages
 const Layout = ({ children }) => {
@@ -13,6 +48,25 @@ const Layout = ({ children }) => {
     const saved = localStorage.getItem('sidebarCollapsed');
     return saved === 'true';
   });
+  const [unclearedAlertCount, setUnclearedAlertCount] = useState(0);
+
+  // Fetch uncleared alerts count
+  const fetchAlertCount = useCallback(async () => {
+    try {
+      const alerts = await apiService.getAllAlerts();
+      const unclearedCount = alerts.filter(a => !a.isCleared).length;
+      setUnclearedAlertCount(unclearedCount);
+    } catch (error) {
+      console.error('Error fetching alert count:', error);
+    }
+  }, []);
+
+  // Poll for new alerts every 30 seconds
+  useEffect(() => {
+    fetchAlertCount();
+    const interval = setInterval(fetchAlertCount, 30000);
+    return () => clearInterval(interval);
+  }, [fetchAlertCount]);
 
   // Save collapse state to localStorage
   useEffect(() => {
@@ -57,7 +111,7 @@ const Layout = ({ children }) => {
             className={`nav-item ${isActive('/devices') ? 'active' : ''}`}
             title="Devices"
           >
-            <span className="nav-icon">💻</span>
+            <span className="nav-icon"><DevicesIcon /></span>
             <span className="nav-label">Devices</span>
           </Link>
           <Link
@@ -65,7 +119,7 @@ const Layout = ({ children }) => {
             className={`nav-item ${isActive('/dashboard') ? 'active' : ''}`}
             title="Dashboard"
           >
-            <span className="nav-icon">📊</span>
+            <span className="nav-icon"><DashboardIcon /></span>
             <span className="nav-label">Dashboard</span>
           </Link>
           <Link
@@ -73,7 +127,7 @@ const Layout = ({ children }) => {
             className={`nav-item ${isActive('/alerts') ? 'active' : ''}`}
             title="Alerts"
           >
-            <span className="nav-icon">⚠️</span>
+            <span className="nav-icon"><AlertsIcon count={unclearedAlertCount} /></span>
             <span className="nav-label">Alerts</span>
           </Link>
         </nav>

@@ -6,6 +6,7 @@ import Modal from '../../components/Modal';
 import MonitoredFilesList from '../MonitoredFiles/MonitoredFilesList';
 import MonitoredFilesForm from '../MonitoredFiles/MonitoredFilesForm';
 import MonitoredFilesEditForm from '../MonitoredFiles/MonitoredFilesEditForm';
+import MonitoredFileDetails from '../MonitoredFiles/MonitoredFileDetails';
 import './Device.css';
 
 const DeviceMonitoredFiles = () => {
@@ -87,7 +88,8 @@ const DeviceMonitoredFiles = () => {
     };
 
     const handleViewDetails = (file) => {
-        navigate(`/monitored-files/${file.id}`);
+        setEditingFile(file);
+        setViewMode('details');
     };
 
     const handleCancelForm = () => {
@@ -218,6 +220,16 @@ const DeviceMonitoredFiles = () => {
                         onSave={handleUploadVersion}
                         editingFile={editingFile}
                         directories={directories}
+                    />
+                </div>
+            )}
+
+            {viewMode === 'details' && (
+                <div className="simple-card">
+                    <MonitoredFileDetails
+                        fileId={editingFile?.id}
+                        onBack={handleCancelForm}
+                        isEmbedded={true}
                     />
                 </div>
             )}
