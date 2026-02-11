@@ -378,9 +378,6 @@ BEGIN
         [FileHash] [nvarchar](max) NULL,
         [DetectedDate] [datetime] NOT NULL DEFAULT GETDATE(),
         [StoredDirectory] [nvarchar](max) NOT NULL DEFAULT '',
-        [AbsoluteDirectory] [nvarchar](500) NOT NULL,
-        [FileName] [nvarchar](500) NOT NULL,
-        [ParentDirectory] [nvarchar](max) NOT NULL,
         [IsDeleted] [bit] NOT NULL DEFAULT 0,
         [CreatedDate] [datetime] NOT NULL DEFAULT GETDATE(),
         CONSTRAINT [PK_MonitoredFileChangeHistory] PRIMARY KEY CLUSTERED ([ID] ASC)

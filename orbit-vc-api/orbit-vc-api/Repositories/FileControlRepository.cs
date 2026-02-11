@@ -326,9 +326,9 @@ namespace orbit_vc_api.Repositories
 
             const string sql = @"
                 INSERT INTO MonitoredFileChangeHistory
-                (ID, MonitoredFileID, MonitoredFileVersionID, VersionNo, FileDateModified, FileSize, FileHash, DetectedDate, StoredDirectory, AbsoluteDirectory, FileName, ParentDirectory, IsDeleted, CreatedDate)
+                (ID, MonitoredFileID, MonitoredFileVersionID, VersionNo, FileDateModified, FileSize, FileHash, DetectedDate, StoredDirectory, IsDeleted, CreatedDate)
                 VALUES
-                (@ID, @MonitoredFileID, @MonitoredFileVersionID, @VersionNo, @FileDateModified, @FileSize, @FileHash, @DetectedDate, @StoredDirectory, @AbsoluteDirectory, @FileName, @ParentDirectory, @IsDeleted, @CreatedDate)";
+                (@ID, @MonitoredFileID, @MonitoredFileVersionID, @VersionNo, @FileDateModified, @FileSize, @FileHash, @DetectedDate, @StoredDirectory, @IsDeleted, @CreatedDate)";
 
             await connection.ExecuteAsync(sql, history);
             return history.ID;

@@ -192,10 +192,10 @@ def run(config):
                     new_history_id = uuid.uuid4()
                     cursor.execute("""
                         INSERT INTO MonitoredFileChangeHistory
-                        (ID, MonitoredFileID, MonitoredFileVersionID, VersionNo, FileDateModified, FileSize, FileHash, DetectedDate, StoredDirectory, AbsoluteDirectory, FileName, ParentDirectory, IsDeleted, CreatedDate)
+                        (ID, MonitoredFileID, MonitoredFileVersionID, VersionNo, FileDateModified, FileSize, FileHash, DetectedDate, StoredDirectory, IsDeleted, CreatedDate)
                         VALUES
-                        (?, ?, ?, ?, ?, ?, ?, GETDATE(), ?, ?, ?, ?, 0, GETDATE())
-                    """, (new_history_id, file_id, monitored_file_version_id, next_ver, file_date_mod, file_size_str, current_hash, new_stored_path, abs_directory, file_name, parent_dir))
+                        (?, ?, ?, ?, ?, ?, ?, GETDATE(), ?, 0, GETDATE())
+                    """, (new_history_id, file_id, monitored_file_version_id, next_ver, file_date_mod, file_size_str, current_hash, new_stored_path))
 
                     # Update MonitoredFile LastScan
                     cursor.execute("""
