@@ -1,0 +1,202 @@
+import React, { useState, useEffect } from 'react';
+import apiService from '../../services/api-service';
+import LoadingSpinner from '../../components/LoadingSpinner';
+import './MonitoredFilesChangeHistory.css';
+
+const MonitoredFilesChangeHistoryList = ({ versionId, version, onBack }) => {
+    const [changeHistory, setChangeHistory] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [selectedHistory, setSelectedHistory] = useState(null);
+    const [versionContent, setVersionContent] = useState(null);
+    const [historyContent, setHistoryContent] = useState(null);
+    const [loadingContent, setLoadingContent] = useState(false);
+
+    useEffect(() => {
+        const fetchChangeHistory = async () => {
+            if (!versionId) return;
+            try {
+                const data = await apiService.getChangeHistoryByVersionId(versionId);
+                setChangeHistory(data);
+            } catch (error) {
+                console.error('Error fetching change history:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchChangeHistory();
+    }, [versionId]);
+
+    const handleDownloadVersion = async () => {
+        try {
+            const blob = await apiService.downloadVersionFile(versionId);
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = version?.fileName || 'version-file';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            a.remove();
+        } catch (error) {
+            console.error('Error downloading version file:', error);
+            alert('Failed to download file');
+        }
+    };
+
+    const handleDownloadHistory = async (history) => {
+        try {
+            const blob = await apiService.downloadChangeHistoryFile(history.id);
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `change-${history.versionNo}-${version?.fileName || 'file'}`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            a.remove();
+        } catch (error) {
+            console.error('Error downloading change history file:', error);
+            alert('Failed to download file');
+        }
+    };
+
+    const handleCompare = async (history) => {
+        setSelectedHistory(history);
+        setLoadingContent(true);
+        setVersionContent(null);
+        setHistoryContent(null);
+
+        try {
+            // Download both files and read as text
+            const [versionBlob, historyBlob] = await Promise.all([
+                apiService.downloadVersionFile(versionId),
+                apiService.downloadChangeHistoryFile(history.id)
+            ]);
+
+            const versionText = await versionBlob.text();
+            const historyText = await historyBlob.text();
+
+            setVersionContent(versionText);
+            setHistoryContent(historyText);
+        } catch (error) {
+            console.error('Error loading file contents:', error);
+            setVersionContent('Error loading file content');
+            setHistoryContent('Error loading file content');
+        } finally {
+            setLoadingContent(false);
+        }
+    };
+
+    const formatFileSize = (bytes) => {
+        if (!bytes) return '-';
+        const numBytes = parseFloat(bytes);
+        if (isNaN(numBytes) || numBytes === 0) return '-';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(numBytes) / Math.log(k));
+        if (i < 0) return numBytes + ' Bytes';
+        return parseFloat((numBytes / Math.pow(k, Math.min(i, sizes.length - 1))).toFixed(2)) + ' ' + sizes[Math.min(i, sizes.length - 1)];
+    };
+
+    if (loading) return <LoadingSpinner fullScreen={false} size="small" />;
+
+    return (
+        <div className="change-history-container">
+            <div className="form-header">
+                <button className="btn-icon-back" onClick={onBack} title="Back" type="button">
+
+                </button>
+                <h3>Change History: {version?.fileName || 'Loading...'}</h3>
+            </div>
+
+            <div className="version-info-card">
+                <div className="version-info-header">
+                    <h4>Uploaded Version (Version {version?.versionNo})</h4>
+                    <button className="btn-download" onClick={handleDownloadVersion}>
+                        Download Original
+                    </button>
+                </div>
+                <div className="version-info-details">
+                    <span>Size: {formatFileSize(version?.fileSize)}</span>
+                    <span>Hash: {version?.fileHash?.substring(0, 16)}...</span>
+                    <span>Modified: {version?.fileDateModified ? new Date(version.fileDateModified).toLocaleString() : '-'}</span>
+                </div>
+            </div>
+
+            <div className="change-history-section">
+                <h4>Detected Changes ({changeHistory.length})</h4>
+                {changeHistory.length > 0 ? (
+                    <table className="simple-table data-table">
+                        <thead>
+                            <tr>
+                                <th>Change #</th>
+                                <th>Detected Date</th>
+                                <th>File Size</th>
+                                <th>File Hash</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {changeHistory.map(h => (
+                                <tr key={h.id} className={selectedHistory?.id === h.id ? 'selected' : ''}>
+                                    <td>{h.versionNo}</td>
+                                    <td>{h.detectedDate ? new Date(h.detectedDate).toLocaleString() : '-'}</td>
+                                    <td>{formatFileSize(h.fileSize)}</td>
+                                    <td title={h.fileHash}>{h.fileHash?.substring(0, 16)}...</td>
+                                    <td className="actions-cell">
+                                        <button
+                                            className="btn-action btn-compare"
+                                            onClick={() => handleCompare(h)}
+                                            title="Compare with original"
+                                        >
+                                            Compare
+                                        </button>
+                                        <button
+                                            className="btn-action btn-download-sm"
+                                            onClick={() => handleDownloadHistory(h)}
+                                            title="Download this version"
+                                        >
+                                            Download
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                ) : (
+                    <div className="empty-state">
+                        <p>No changes detected for this version.</p>
+                    </div>
+                )}
+            </div>
+
+            {selectedHistory && (
+                <div className="comparison-section">
+                    <h4>Comparison: Original vs Change #{selectedHistory.versionNo}</h4>
+                    {loadingContent ? (
+                        <LoadingSpinner fullScreen={false} size="small" />
+                    ) : (
+                        <div className="comparison-panels">
+                            <div className="comparison-panel">
+                                <div className="panel-header original">
+                                    <span>Original (Uploaded Version {version?.versionNo})</span>
+                                    <span className="file-size">{formatFileSize(version?.fileSize)}</span>
+                                </div>
+                                <pre className="file-content">{versionContent || 'No content'}</pre>
+                            </div>
+                            <div className="comparison-panel">
+                                <div className="panel-header changed">
+                                    <span>Changed (Change #{selectedHistory.versionNo})</span>
+                                    <span className="file-size">{formatFileSize(selectedHistory.fileSize)}</span>
+                                </div>
+                                <pre className="file-content">{historyContent || 'No content'}</pre>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default MonitoredFilesChangeHistoryList;

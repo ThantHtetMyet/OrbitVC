@@ -53,6 +53,75 @@ namespace orbit_vc_api.Controllers
             return Ok(versions);
         }
 
+        [HttpGet("versions/{versionId}")]
+        public async Task<ActionResult<MonitoredFileVersion>> GetFileVersion(Guid versionId)
+        {
+            var version = await _repository.GetFileVersionByIdAsync(versionId);
+            if (version == null) return NotFound();
+            return Ok(version);
+        }
+
+        [HttpGet("versions/{versionId}/change-history")]
+        public async Task<ActionResult<IEnumerable<MonitoredFileChangeHistory>>> GetChangeHistoryByVersion(Guid versionId)
+        {
+            var history = await _repository.GetChangeHistoryByVersionIdAsync(versionId);
+            return Ok(history);
+        }
+
+        [HttpGet("change-history/{id}")]
+        public async Task<ActionResult<MonitoredFileChangeHistory>> GetChangeHistoryById(Guid id)
+        {
+            var history = await _repository.GetChangeHistoryByIdAsync(id);
+            if (history == null) return NotFound();
+            return Ok(history);
+        }
+
+        [HttpGet("versions/{versionId}/download")]
+        public async Task<IActionResult> DownloadVersionFile(Guid versionId)
+        {
+            try
+            {
+                var version = await _repository.GetFileVersionByIdAsync(versionId);
+                if (version == null) return NotFound("Version not found");
+
+                if (string.IsNullOrEmpty(version.StoredDirectory) || !System.IO.File.Exists(version.StoredDirectory))
+                    return NotFound("File not found on server");
+
+                var fileBytes = await System.IO.File.ReadAllBytesAsync(version.StoredDirectory);
+                return File(fileBytes, "application/octet-stream", version.FileName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("System", "DOWNLOAD_VERSION_ERROR", $"Failed to download version {versionId}", ex);
+                return StatusCode(500, "Failed to download file");
+            }
+        }
+
+        [HttpGet("change-history/{id}/download")]
+        public async Task<IActionResult> DownloadChangeHistoryFile(Guid id)
+        {
+            try
+            {
+                var history = await _repository.GetChangeHistoryByIdAsync(id);
+                if (history == null) return NotFound("Change history not found");
+
+                if (string.IsNullOrEmpty(history.StoredDirectory) || !System.IO.File.Exists(history.StoredDirectory))
+                    return NotFound("File not found on server");
+
+                // Get file name from version
+                var version = await _repository.GetFileVersionByIdAsync(history.MonitoredFileVersionID);
+                var fileName = version?.FileName ?? $"change-history-{history.VersionNo}";
+
+                var fileBytes = await System.IO.File.ReadAllBytesAsync(history.StoredDirectory);
+                return File(fileBytes, "application/octet-stream", fileName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("System", "DOWNLOAD_CHANGE_HISTORY_ERROR", $"Failed to download change history {id}", ex);
+                return StatusCode(500, "Failed to download file");
+            }
+        }
+
         public class CreateFileRequest
         {
             public Guid DeviceID { get; set; }

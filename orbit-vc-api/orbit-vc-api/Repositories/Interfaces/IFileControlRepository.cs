@@ -17,6 +17,7 @@ namespace orbit_vc_api.Repositories.Interfaces
         // MonitoredFileVersion
         Task<Guid> CreateMonitoredFileVersionAsync(MonitoredFileVersion version);
         Task<MonitoredFileVersion?> GetLatestFileVersionAsync(Guid fileId);
+        Task<MonitoredFileVersion?> GetFileVersionByIdAsync(Guid versionId);
         Task<IEnumerable<MonitoredFileVersion>> GetMonitoredFileVersionsAsync(Guid fileId);
         Task<IEnumerable<MonitoredFileVersionDetailDto>> GetMonitoredFileVersionsWithIpAsync(Guid fileId);
         Task<IEnumerable<string>> GetUniqueDirectoriesByDeviceAsync(Guid deviceId);
@@ -35,6 +36,8 @@ namespace orbit_vc_api.Repositories.Interfaces
         // MonitoredFileChangeHistory
         Task<Guid> CreateChangeHistoryAsync(MonitoredFileChangeHistory history);
         Task<IEnumerable<MonitoredFileChangeHistory>> GetChangeHistoryByFileAsync(Guid fileId);
+        Task<IEnumerable<MonitoredFileChangeHistory>> GetChangeHistoryByVersionIdAsync(Guid versionId);
+        Task<MonitoredFileChangeHistory?> GetChangeHistoryByIdAsync(Guid id);
         Task<MonitoredFileChangeHistory?> GetLatestChangeHistoryAsync(Guid fileId);
     }
 }

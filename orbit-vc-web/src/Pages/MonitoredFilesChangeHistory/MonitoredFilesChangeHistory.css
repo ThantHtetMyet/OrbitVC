@@ -1,0 +1,253 @@
+/* Change History Container */
+.change-history-container {
+    padding: 0;
+}
+
+.change-history-container .form-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.change-history-container .form-header h3 {
+    margin: 0;
+    color: #fff;
+    font-size: 18px;
+}
+
+/* Version Info Card */
+.version-info-card {
+    background: rgba(0, 212, 255, 0.08);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+}
+
+.version-info-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.version-info-header h4 {
+    margin: 0;
+    color: #00d4ff;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.version-info-details {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+
+.version-info-details span {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 13px;
+}
+
+/* Buttons */
+.btn-download {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.2) 0%, rgba(0, 168, 204, 0.15) 100%);
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    border-radius: 8px;
+    color: #00d4ff;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-download:hover {
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.3) 0%, rgba(0, 168, 204, 0.25) 100%);
+    transform: translateY(-1px);
+}
+
+/* Change History Section */
+.change-history-section {
+    margin-bottom: 24px;
+}
+
+.change-history-section h4 {
+    margin: 0 0 16px 0;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+/* Table Styles */
+.change-history-container .simple-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.change-history-container .simple-table th,
+.change-history-container .simple-table td {
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.change-history-container .simple-table th {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.change-history-container .simple-table td {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 13px;
+}
+
+.change-history-container .simple-table tr.selected {
+    background: rgba(0, 212, 255, 0.1);
+}
+
+.change-history-container .simple-table tr:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+/* Action Buttons */
+.actions-cell {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-action {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+}
+
+.btn-compare {
+    background: linear-gradient(135deg, rgba(96, 165, 250, 0.2) 0%, rgba(59, 130, 246, 0.15) 100%);
+    border: 1px solid rgba(96, 165, 250, 0.3);
+    color: #60a5fa;
+}
+
+.btn-compare:hover {
+    background: linear-gradient(135deg, rgba(96, 165, 250, 0.3) 0%, rgba(59, 130, 246, 0.25) 100%);
+}
+
+.btn-download-sm {
+    background: linear-gradient(135deg, rgba(74, 222, 128, 0.2) 0%, rgba(34, 197, 94, 0.15) 100%);
+    border: 1px solid rgba(74, 222, 128, 0.3);
+    color: #4ade80;
+}
+
+.btn-download-sm:hover {
+    background: linear-gradient(135deg, rgba(74, 222, 128, 0.3) 0%, rgba(34, 197, 94, 0.25) 100%);
+}
+
+/* Comparison Section */
+.comparison-section {
+    margin-top: 24px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 24px;
+}
+
+.comparison-section h4 {
+    margin: 0 0 16px 0;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.comparison-panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.comparison-panel {
+    background: rgba(10, 15, 26, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.panel-header.original {
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.15) 0%, rgba(0, 168, 204, 0.1) 100%);
+    color: #00d4ff;
+    border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+}
+
+.panel-header.changed {
+    background: linear-gradient(135deg, rgba(251, 146, 60, 0.15) 0%, rgba(249, 115, 22, 0.1) 100%);
+    color: #fb923c;
+    border-bottom: 1px solid rgba(251, 146, 60, 0.2);
+}
+
+.panel-header .file-size {
+    font-weight: 400;
+    opacity: 0.8;
+    font-size: 12px;
+}
+
+.file-content {
+    margin: 0;
+    padding: 16px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.85);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 400px;
+    overflow-y: auto;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.file-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.file-content::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+.file-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+
+.file-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Empty State */
+.change-history-container .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .comparison-panels {
+        grid-template-columns: 1fr;
+    }
+}

@@ -4,7 +4,7 @@ import apiService from '../../services/api-service';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import '../Device/Device.css';
 
-const MonitoredFileDetails = ({ fileId, onBack, isEmbedded = false }) => {
+const MonitoredFileDetails = ({ fileId, onBack, isEmbedded = false, onViewChangeHistory }) => {
     const { id } = useParams(); // File ID from URL if not embedded
     const navigate = useNavigate();
     const [versions, setVersions] = useState([]);
@@ -80,7 +80,7 @@ const MonitoredFileDetails = ({ fileId, onBack, isEmbedded = false }) => {
                         title="Back to List"
                         type="button"
                     >
-                        ←
+                        &larr;
                     </button>
                     <h3>File History: {fileName || 'Loading...'}</h3>
                 </div>
@@ -94,16 +94,36 @@ const MonitoredFileDetails = ({ fileId, onBack, isEmbedded = false }) => {
                                 <th>Detected Date</th>
                                 <th>Size</th>
                                 <th>Absolute Path</th>
+                                {onViewChangeHistory && <th>Actions</th>}
                             </tr>
                         </thead>
                         <tbody>
                             {versions.map(v => (
-                                <tr key={v.id}>
+                                <tr
+                                    key={v.id}
+                                    onClick={() => onViewChangeHistory && onViewChangeHistory(v)}
+                                    className={onViewChangeHistory ? "clickable-row" : ""}
+                                    title={onViewChangeHistory ? "Click to view change history" : ""}
+                                >
                                     <td>{v.versionNo}</td>
                                     <td>{v.fileDateModified ? new Date(v.fileDateModified).toLocaleString() : '-'}</td>
                                     <td>{v.detectedDate ? new Date(v.detectedDate).toLocaleString() : '-'}</td>
                                     <td>{formatFileSize(v.fileSize)}</td>
                                     <td className="path-cell">{constructUncPath(v.ipAddress, v.absoluteDirectory)}</td>
+                                    {onViewChangeHistory && (
+                                        <td>
+                                            <button
+                                                className="btn-action-link"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onViewChangeHistory(v);
+                                                }}
+                                                title="View change history for this version"
+                                            >
+                                                View Changes
+                                            </button>
+                                        </td>
+                                    )}
                                 </tr>
                             ))}
                         </tbody>
@@ -121,7 +141,7 @@ const MonitoredFileDetails = ({ fileId, onBack, isEmbedded = false }) => {
         <div className="device-container">
             <div className="device-header detail-header">
                 <button className="btn-back" onClick={handleBack}>
-                    ← Back
+                    &larr; Back
                 </button>
             </div>
             <div className="device-title-card">

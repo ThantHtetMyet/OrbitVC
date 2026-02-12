@@ -61,9 +61,9 @@ const MonitoredFilesList = ({ monitoredFiles, onEdit, onDelete, onViewDetails })
                 {monitoredFiles.map(file => (
                     <tr
                         key={file.id}
-                        onDoubleClick={() => onViewDetails(file)}
+                        onClick={() => onViewDetails(file)}
                         className="clickable-row"
-                        title="Double click to view details"
+                        title="Click to view details"
                     >
                         <td className="path-cell">{file.directoryPath}</td>
                         <td>{file.fileName}</td>

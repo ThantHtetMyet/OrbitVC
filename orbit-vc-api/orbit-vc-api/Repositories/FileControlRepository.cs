@@ -141,12 +141,19 @@ namespace orbit_vc_api.Repositories
         {
             using var connection = CreateConnection();
             const string sql = @"
-                SELECT TOP 1 * 
-                FROM MonitoredFileVersions 
-                WHERE MonitoredFileID = @FileId 
+                SELECT TOP 1 *
+                FROM MonitoredFileVersions
+                WHERE MonitoredFileID = @FileId
                 ORDER BY VersionNo DESC";
-            
+
             return await connection.QuerySingleOrDefaultAsync<MonitoredFileVersion>(sql, new { FileId = fileId });
+        }
+
+        public async Task<MonitoredFileVersion?> GetFileVersionByIdAsync(Guid versionId)
+        {
+            using var connection = CreateConnection();
+            const string sql = "SELECT * FROM MonitoredFileVersions WHERE ID = @Id";
+            return await connection.QuerySingleOrDefaultAsync<MonitoredFileVersion>(sql, new { Id = versionId });
         }
 
         public async Task<IEnumerable<MonitoredFileVersion>> GetMonitoredFileVersionsAsync(Guid fileId)
@@ -343,6 +350,24 @@ namespace orbit_vc_api.Repositories
                 ORDER BY VersionNo DESC";
 
             return await connection.QueryAsync<MonitoredFileChangeHistory>(sql, new { FileId = fileId });
+        }
+
+        public async Task<IEnumerable<MonitoredFileChangeHistory>> GetChangeHistoryByVersionIdAsync(Guid versionId)
+        {
+            using var connection = CreateConnection();
+            const string sql = @"
+                SELECT * FROM MonitoredFileChangeHistory
+                WHERE MonitoredFileVersionID = @VersionId
+                ORDER BY VersionNo DESC";
+
+            return await connection.QueryAsync<MonitoredFileChangeHistory>(sql, new { VersionId = versionId });
+        }
+
+        public async Task<MonitoredFileChangeHistory?> GetChangeHistoryByIdAsync(Guid id)
+        {
+            using var connection = CreateConnection();
+            const string sql = "SELECT * FROM MonitoredFileChangeHistory WHERE ID = @Id";
+            return await connection.QuerySingleOrDefaultAsync<MonitoredFileChangeHistory>(sql, new { Id = id });
         }
 
         public async Task<MonitoredFileChangeHistory?> GetLatestChangeHistoryAsync(Guid fileId)

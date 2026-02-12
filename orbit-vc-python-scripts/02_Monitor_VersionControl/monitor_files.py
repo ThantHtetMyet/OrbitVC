@@ -50,17 +50,17 @@ def run(config):
         cursor = conn.cursor()
 
         # Get all monitored files with their latest version info
-        # First check MonitoredFileChangeHistory, fall back to MonitoredFileVersions
+        # File path info comes from MonitoredFileVersions, hash comparison from MonitoredFileChangeHistory
         cursor.execute("""
             SELECT
                 mf.ID,
                 mf.DeviceID,
                 v.ID AS MonitoredFileVersionID,
-                COALESCE(ch.AbsoluteDirectory, v.AbsoluteDirectory) AS AbsoluteDirectory,
-                COALESCE(ch.FileName, v.FileName) AS FileName,
+                v.AbsoluteDirectory,
+                v.FileName,
+                v.ParentDirectory,
                 COALESCE(ch.FileHash, v.FileHash) AS FileHash,
                 COALESCE(ch.FileSize, v.FileSize) AS FileSize,
-                COALESCE(ch.ParentDirectory, v.ParentDirectory) AS ParentDirectory,
                 COALESCE(ch.FileDateModified, v.FileDateModified) AS FileDateModified,
                 COALESCE(ch.VersionNo, 0) AS ChangeHistoryVersionNo
             FROM MonitoredFiles mf

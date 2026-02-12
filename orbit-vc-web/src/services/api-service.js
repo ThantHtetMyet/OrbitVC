@@ -318,6 +318,55 @@ class ApiService {
     }
 
     /**
+     * Get a specific file version by version ID
+     */
+    async getFileVersionById(versionId) {
+        return await this.get(`/FileControl/versions/${versionId}`);
+    }
+
+    /**
+     * Get change history for a specific version
+     */
+    async getChangeHistoryByVersionId(versionId) {
+        return await this.get(`/FileControl/versions/${versionId}/change-history`);
+    }
+
+    /**
+     * Get a specific change history by ID
+     */
+    async getChangeHistoryById(id) {
+        return await this.get(`/FileControl/change-history/${id}`);
+    }
+
+    /**
+     * Download a version file
+     */
+    async downloadVersionFile(versionId) {
+        const token = localStorage.getItem('authToken');
+        const headers = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        const response = await fetch(`${this.baseUrl}/FileControl/versions/${versionId}/download`, { headers });
+        if (!response.ok) throw new Error('Download failed');
+        return response.blob();
+    }
+
+    /**
+     * Download a change history file
+     */
+    async downloadChangeHistoryFile(id) {
+        const token = localStorage.getItem('authToken');
+        const headers = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        const response = await fetch(`${this.baseUrl}/FileControl/change-history/${id}/download`, { headers });
+        if (!response.ok) throw new Error('Download failed');
+        return response.blob();
+    }
+
+    /**
      * Upload a new version for a monitored file
      */
     async uploadMonitoredFileVersion(fileId, file, fileName, directoryPath) {
