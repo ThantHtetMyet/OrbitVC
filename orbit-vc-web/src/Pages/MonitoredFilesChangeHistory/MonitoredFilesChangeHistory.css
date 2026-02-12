@@ -116,10 +116,33 @@
     background: rgba(255, 255, 255, 0.03);
 }
 
+/* Hash Cell with Copy Button */
+.hash-cell {
+    white-space: nowrap;
+}
+
+.hash-cell span {
+    margin-right: 8px;
+}
+
+.btn-copy {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 2px 4px;
+    font-size: 12px;
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+    vertical-align: middle;
+}
+
+.btn-copy:hover {
+    opacity: 1;
+}
+
 /* Action Buttons */
 .actions-cell {
-    display: flex;
-    gap: 8px;
+    white-space: nowrap;
 }
 
 .btn-action {

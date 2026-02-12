@@ -26,23 +26,6 @@ const MonitoredFilesChangeHistoryList = ({ versionId, version, onBack }) => {
         fetchChangeHistory();
     }, [versionId]);
 
-    const handleDownloadVersion = async () => {
-        try {
-            const blob = await apiService.downloadVersionFile(versionId);
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = version?.fileName || 'version-file';
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            a.remove();
-        } catch (error) {
-            console.error('Error downloading version file:', error);
-            alert('Failed to download file');
-        }
-    };
-
     const handleDownloadHistory = async (history) => {
         try {
             const blob = await apiService.downloadChangeHistoryFile(history.id);
@@ -98,29 +81,23 @@ const MonitoredFilesChangeHistoryList = ({ versionId, version, onBack }) => {
         return parseFloat((numBytes / Math.pow(k, Math.min(i, sizes.length - 1))).toFixed(2)) + ' ' + sizes[Math.min(i, sizes.length - 1)];
     };
 
+    const handleCopyHash = async (hash) => {
+        try {
+            await navigator.clipboard.writeText(hash);
+        } catch (error) {
+            console.error('Failed to copy hash:', error);
+        }
+    };
+
     if (loading) return <LoadingSpinner fullScreen={false} size="small" />;
 
     return (
         <div className="change-history-container">
             <div className="form-header">
                 <button className="btn-icon-back" onClick={onBack} title="Back" type="button">
-
+                    &larr;
                 </button>
                 <h3>Change History: {version?.fileName || 'Loading...'}</h3>
-            </div>
-
-            <div className="version-info-card">
-                <div className="version-info-header">
-                    <h4>Uploaded Version (Version {version?.versionNo})</h4>
-                    <button className="btn-download" onClick={handleDownloadVersion}>
-                        Download Original
-                    </button>
-                </div>
-                <div className="version-info-details">
-                    <span>Size: {formatFileSize(version?.fileSize)}</span>
-                    <span>Hash: {version?.fileHash?.substring(0, 16)}...</span>
-                    <span>Modified: {version?.fileDateModified ? new Date(version.fileDateModified).toLocaleString() : '-'}</span>
-                </div>
             </div>
 
             <div className="change-history-section">
@@ -142,7 +119,16 @@ const MonitoredFilesChangeHistoryList = ({ versionId, version, onBack }) => {
                                     <td>{h.versionNo}</td>
                                     <td>{h.detectedDate ? new Date(h.detectedDate).toLocaleString() : '-'}</td>
                                     <td>{formatFileSize(h.fileSize)}</td>
-                                    <td title={h.fileHash}>{h.fileHash?.substring(0, 16)}...</td>
+                                    <td className="hash-cell" title={h.fileHash}>
+                                        {h.fileHash?.substring(0, 16)}...
+                                        <button
+                                            className="btn-copy"
+                                            onClick={() => handleCopyHash(h.fileHash)}
+                                            title="Copy full hash"
+                                        >
+                                            📋
+                                        </button>
+                                    </td>
                                     <td className="actions-cell">
                                         <button
                                             className="btn-action btn-compare"

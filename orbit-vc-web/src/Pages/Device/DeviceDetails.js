@@ -7,6 +7,7 @@ import MonitoredFilesList from '../MonitoredFiles/MonitoredFilesList';
 import MonitoredFilesForm from '../MonitoredFiles/MonitoredFilesForm';
 import MonitoredFilesEditForm from '../MonitoredFiles/MonitoredFilesEditForm';
 import MonitoredFileDetails from '../MonitoredFiles/MonitoredFileDetails';
+import MonitoredFilesChangeHistoryList from '../MonitoredFilesChangeHistory/MonitoredFilesChangeHistoryList';
 import './Device.css';
 
 const DeviceDetails = () => {
@@ -20,8 +21,9 @@ const DeviceDetails = () => {
     const [activeTab, setActiveTab] = useState('overview');
 
     // Monitored file view state
-    const [viewMode, setViewMode] = useState('list'); // 'list', 'add', 'edit'
+    const [viewMode, setViewMode] = useState('list'); // 'list', 'add', 'edit', 'details', 'changeHistory'
     const [editingFile, setEditingFile] = useState(null);
+    const [selectedVersion, setSelectedVersion] = useState(null);
 
     // Alert modal
     const [modalConfig, setModalConfig] = useState({
@@ -70,9 +72,13 @@ const DeviceDetails = () => {
     }, [activeTab, fetchMonitoredFiles]);
 
     const handleBack = () => {
-        if (activeTab === 'files' && viewMode !== 'list') {
+        if (activeTab === 'files' && viewMode === 'changeHistory') {
+            setViewMode('details');
+            setSelectedVersion(null);
+        } else if (activeTab === 'files' && viewMode !== 'list') {
             setViewMode('list');
             setEditingFile(null);
+            setSelectedVersion(null);
         } else {
             navigate('/devices');
         }
@@ -128,6 +134,16 @@ const DeviceDetails = () => {
 
     const handleViewDetails = (file) => {
         setEditingFile(file);
+        setViewMode('details');
+    };
+
+    const handleViewChangeHistory = (version) => {
+        setSelectedVersion(version);
+        setViewMode('changeHistory');
+    };
+
+    const handleBackFromChangeHistory = () => {
+        setSelectedVersion(null);
         setViewMode('details');
     };
 
@@ -234,7 +250,8 @@ const DeviceDetails = () => {
 
             <div className="device-header detail-header">
                 <button className="btn-back" onClick={handleBack}>
-                    {activeTab === 'files' && viewMode !== 'list' ? '← Back to List' : '← Back to Devices'}
+                    {activeTab === 'files' && viewMode === 'changeHistory' ? '← Back to Details' :
+                     activeTab === 'files' && viewMode !== 'list' ? '← Back to List' : '← Back to Devices'}
                 </button>
                 <div className="header-actions">
                     <button className="btn-primary" onClick={handleEdit}>
@@ -338,6 +355,15 @@ const DeviceDetails = () => {
                                 fileId={editingFile?.id}
                                 onBack={handleCancelForm}
                                 isEmbedded={true}
+                                onViewChangeHistory={handleViewChangeHistory}
+                            />
+                        )}
+
+                        {viewMode === 'changeHistory' && selectedVersion && (
+                            <MonitoredFilesChangeHistoryList
+                                versionId={selectedVersion.id}
+                                version={selectedVersion}
+                                onBack={handleBackFromChangeHistory}
                             />
                         )}
                     </div>

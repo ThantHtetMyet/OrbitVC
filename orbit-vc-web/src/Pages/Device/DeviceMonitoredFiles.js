@@ -7,7 +7,7 @@ import MonitoredFilesList from '../MonitoredFiles/MonitoredFilesList';
 import MonitoredFilesForm from '../MonitoredFiles/MonitoredFilesForm';
 import MonitoredFilesEditForm from '../MonitoredFiles/MonitoredFilesEditForm';
 import MonitoredFileDetails from '../MonitoredFiles/MonitoredFileDetails';
-import { MonitoredFilesChangeHistoryList } from '../MonitoredFilesChangeHistory';
+import MonitoredFilesChangeHistoryList from '../MonitoredFilesChangeHistory/MonitoredFilesChangeHistoryList';
 import './Device.css';
 
 const DeviceMonitoredFiles = () => {
