@@ -10,6 +10,8 @@ const MonitoredFilesChangeHistoryList = ({ versionId, version, onBack }) => {
     const [versionContent, setVersionContent] = useState(null);
     const [historyContent, setHistoryContent] = useState(null);
     const [loadingContent, setLoadingContent] = useState(false);
+    const [restoreLoading, setRestoreLoading] = useState(false);
+    const [restoreModal, setRestoreModal] = useState({ isOpen: false, success: false, message: '' });
 
     useEffect(() => {
         const fetchChangeHistory = async () => {
@@ -89,6 +91,33 @@ const MonitoredFilesChangeHistoryList = ({ versionId, version, onBack }) => {
         }
     };
 
+    const handleRestore = async () => {
+        if (!versionId) return;
+
+        setRestoreLoading(true);
+        try {
+            const result = await apiService.restoreFileVersion(versionId);
+            setRestoreModal({
+                isOpen: true,
+                success: true,
+                message: result.message || `File restored successfully to ${result.destinationPath || version?.absoluteDirectory}`
+            });
+        } catch (error) {
+            console.error('Error restoring file:', error);
+            setRestoreModal({
+                isOpen: true,
+                success: false,
+                message: error.message || 'Failed to restore file. Please check if the device is accessible.'
+            });
+        } finally {
+            setRestoreLoading(false);
+        }
+    };
+
+    const closeRestoreModal = () => {
+        setRestoreModal({ isOpen: false, success: false, message: '' });
+    };
+
     if (loading) return <LoadingSpinner fullScreen={false} size="small" />;
 
     return (
@@ -98,6 +127,14 @@ const MonitoredFilesChangeHistoryList = ({ versionId, version, onBack }) => {
                     &larr;
                 </button>
                 <h3>Change History: {version?.fileName || 'Loading...'}</h3>
+                <button
+                    className="btn-restore"
+                    onClick={handleRestore}
+                    disabled={restoreLoading}
+                    title="Restore original file to target location"
+                >
+                    {restoreLoading ? 'Restoring...' : 'Restore Original'}
+                </button>
             </div>
 
             <div className="change-history-section">
@@ -106,7 +143,7 @@ const MonitoredFilesChangeHistoryList = ({ versionId, version, onBack }) => {
                     <table className="simple-table data-table">
                         <thead>
                             <tr>
-                                <th>Change #</th>
+                                <th>Version</th>
                                 <th>Detected Date</th>
                                 <th>File Size</th>
                                 <th>File Hash</th>
@@ -181,13 +218,31 @@ const MonitoredFilesChangeHistoryList = ({ versionId, version, onBack }) => {
                             </div>
                             <div className="comparison-panel">
                                 <div className="panel-header changed">
-                                    <span>Changed (Change #{selectedHistory.versionNo})</span>
+                                    <span>Changed (Version - {selectedHistory.versionNo})</span>
                                     <span className="file-size">{formatFileSize(selectedHistory.fileSize)}</span>
                                 </div>
                                 <pre className="file-content">{historyContent || 'No content'}</pre>
                             </div>
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* Restore Result Modal */}
+            {restoreModal.isOpen && (
+                <div className="modal-overlay" onClick={closeRestoreModal}>
+                    <div className="restore-modal" onClick={e => e.stopPropagation()}>
+                        <div className={`restore-modal-icon ${restoreModal.success ? 'success' : 'error'}`}>
+                            {restoreModal.success ? '✓' : '✕'}
+                        </div>
+                        <h3 className="restore-modal-title">
+                            {restoreModal.success ? 'Restore Successful' : 'Restore Failed'}
+                        </h3>
+                        <p className="restore-modal-message">{restoreModal.message}</p>
+                        <button className="btn-modal-close" onClick={closeRestoreModal}>
+                            Close
+                        </button>
+                    </div>
                 </div>
             )}
         </div>

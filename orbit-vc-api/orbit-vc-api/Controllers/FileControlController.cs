@@ -396,6 +396,130 @@ namespace orbit_vc_api.Controllers
             }
         }
 
+        [HttpPost("versions/{versionId}/restore")]
+        public async Task<ActionResult> RestoreVersionFile(Guid versionId)
+        {
+            try
+            {
+                // Get the version
+                var version = await _repository.GetFileVersionByIdAsync(versionId);
+                if (version == null) return NotFound("Version not found");
+
+                // Check if stored file exists
+                if (string.IsNullOrEmpty(version.StoredDirectory) || !System.IO.File.Exists(version.StoredDirectory))
+                    return BadRequest("Stored file not found on server");
+
+                // Check if absolute directory is set
+                if (string.IsNullOrEmpty(version.AbsoluteDirectory))
+                    return BadRequest("Target path (AbsoluteDirectory) is not set");
+
+                // Get the monitored file to get device info
+                var monitoredFile = await _repository.GetMonitoredFileByIdAsync(version.MonitoredFileID);
+                if (monitoredFile == null) return NotFound("Monitored file not found");
+
+                // Get device to get IP address
+                var device = await _deviceRepository.GetByIdAsync(monitoredFile.DeviceID);
+                if (device == null) return NotFound("Device not found");
+
+                var ipAddresses = await _deviceRepository.GetIPAddressesByDeviceIdAsync(device.ID);
+                string? targetIp = ipAddresses.FirstOrDefault(ip => ip.IPAddress.StartsWith("10.") || ip.IPAddress.StartsWith("192."))?.IPAddress
+                                ?? ipAddresses.FirstOrDefault()?.IPAddress;
+
+                if (string.IsNullOrEmpty(targetIp))
+                    return BadRequest("No IP address found for device");
+
+                // Run the restore script
+                var restoreResult = await RunRestoreFileAsync(targetIp, version.AbsoluteDirectory, version.StoredDirectory);
+
+                if (restoreResult.Success)
+                {
+                    _logger.LogActivity("File Restore Success", $"Restored file: {version.FileName} to {version.AbsoluteDirectory} via {targetIp}");
+                    return Ok(new { success = true, message = restoreResult.Message, destinationPath = $"\\\\{targetIp}\\{version.AbsoluteDirectory}" });
+                }
+                else
+                {
+                    _logger.LogActivity("File Restore Failed", $"Failed to restore: {restoreResult.Message}");
+                    return BadRequest(new { success = false, message = restoreResult.Message });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("System", "RESTORE_FILE_ERROR", $"Failed to restore version {versionId}", ex);
+                return StatusCode(500, new { success = false, message = "Internal server error" });
+            }
+        }
+
+        private async Task<RestoreResult> RunRestoreFileAsync(string ipAddress, string destPath, string sourcePath)
+        {
+            try
+            {
+                var scriptPath = Path.Combine(_env.ContentRootPath, "PythonScripts", "02_Monitor_VersionControl", "restore_file.py");
+
+                if (!System.IO.File.Exists(scriptPath))
+                {
+                    _logger.LogError("System", "RESTORE_SCRIPT_ERROR", $"Python script not found at: {scriptPath}", null);
+                    return new RestoreResult { Success = false, Message = "Restore script not found" };
+                }
+
+                var args = $"\"{scriptPath}\" \"{ipAddress}\" \"{destPath}\" \"{sourcePath}\"";
+
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = "python",
+                    Arguments = args,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var process = new Process { StartInfo = startInfo };
+                process.Start();
+
+                var output = await process.StandardOutput.ReadToEndAsync();
+                var error = await process.StandardError.ReadToEndAsync();
+
+                await process.WaitForExitAsync();
+
+                if (process.ExitCode == 0)
+                {
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(output);
+                        if (doc.RootElement.TryGetProperty("success", out var successElement) && successElement.GetBoolean())
+                        {
+                            var msg = doc.RootElement.TryGetProperty("message", out var m) ? m.GetString() : "File restored successfully";
+                            return new RestoreResult { Success = true, Message = msg };
+                        }
+                        else
+                        {
+                            var msg = doc.RootElement.TryGetProperty("message", out var m) ? m.GetString() : "Unknown error";
+                            return new RestoreResult { Success = false, Message = msg };
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        return new RestoreResult { Success = false, Message = "Failed to parse script output: " + ex.Message };
+                    }
+                }
+                else
+                {
+                    return new RestoreResult { Success = false, Message = $"Script failed (Exit Code: {process.ExitCode}). Error: {error}" };
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("System", "RESTORE_FILE_EXCEPTION", "Error running restore script", ex);
+                return new RestoreResult { Success = false, Message = "Internal error during file restore" };
+            }
+        }
+
+        private class RestoreResult
+        {
+            public bool Success { get; set; }
+            public string? Message { get; set; }
+        }
+
 
 
 

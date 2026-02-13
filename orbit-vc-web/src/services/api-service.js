@@ -449,6 +449,13 @@ class ApiService {
     async clearAlert(id, clearedBy) {
         return await this.put(`/FileControl/alerts/${id}/clear?clearedBy=${encodeURIComponent(clearedBy)}`, {});
     }
+
+    /**
+     * Restore a file version to its original location
+     */
+    async restoreFileVersion(versionId) {
+        return await this.post(`/FileControl/versions/${versionId}/restore`, {});
+    }
 }
 
 const apiService = new ApiService();
