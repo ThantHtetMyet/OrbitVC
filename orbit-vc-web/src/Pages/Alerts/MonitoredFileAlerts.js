@@ -89,8 +89,7 @@ const MonitoredFileAlerts = () => {
 
             <div className="device-title-card">
                 <div className="device-title-text">
-                    <h1 className="device-title-name">Monitored File Alerts</h1>
-                    <span className="device-title-hostname">System-wide Alerts</span>
+                    <h1 className="device-title-name">Alerts</h1>
                 </div>
                 <button className="btn-secondary" onClick={fetchAlerts}>
                     Refresh

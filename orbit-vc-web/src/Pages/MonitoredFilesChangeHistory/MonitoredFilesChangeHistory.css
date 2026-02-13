@@ -1,6 +1,9 @@
 /* Change History Container */
 .change-history-container {
     padding: 0;
+    width: 100%;
+    box-sizing: border-box;
+    overflow-x: auto;
 }
 
 .change-history-container .form-header {
@@ -86,6 +89,8 @@
 .change-history-container .simple-table {
     width: 100%;
     border-collapse: collapse;
+    table-layout: auto;
+    min-width: 700px;
 }
 
 .change-history-container .simple-table th,
@@ -182,11 +187,39 @@
     padding-top: 24px;
 }
 
-.comparison-section h4 {
-    margin: 0 0 16px 0;
+.comparison-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.comparison-header h4 {
+    margin: 0;
     color: #fff;
     font-size: 15px;
     font-weight: 600;
+}
+
+.btn-close-comparison {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.btn-close-comparison:hover {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #ef4444;
 }
 
 .comparison-panels {
@@ -273,4 +306,100 @@
     .comparison-panels {
         grid-template-columns: 1fr;
     }
+}
+
+/* ============================================
+   Light Theme Styles
+   ============================================ */
+
+body.light-theme .change-history-container .form-header {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+body.light-theme .change-history-container .form-header h3 {
+    color: #1a1f2e;
+}
+
+body.light-theme .version-info-card {
+    background: rgba(0, 119, 182, 0.08);
+    border: 1px solid rgba(0, 119, 182, 0.2);
+}
+
+body.light-theme .version-info-header h4 {
+    color: #0077b6;
+}
+
+body.light-theme .version-info-details span {
+    color: rgba(0, 0, 0, 0.7);
+}
+
+body.light-theme .change-history-section h4 {
+    color: #1a1f2e;
+}
+
+body.light-theme .change-history-container .simple-table th,
+body.light-theme .change-history-container .simple-table td {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+body.light-theme .change-history-container .simple-table th {
+    color: rgba(0, 0, 0, 0.6);
+}
+
+body.light-theme .change-history-container .simple-table td {
+    color: rgba(0, 0, 0, 0.85);
+}
+
+body.light-theme .change-history-container .simple-table tr.selected {
+    background: rgba(0, 119, 182, 0.1);
+}
+
+body.light-theme .change-history-container .simple-table tr:hover {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+body.light-theme .comparison-section {
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+body.light-theme .comparison-header h4 {
+    color: #1a1f2e;
+}
+
+body.light-theme .btn-close-comparison {
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    background: rgba(0, 0, 0, 0.03);
+    color: rgba(0, 0, 0, 0.6);
+}
+
+body.light-theme .btn-close-comparison:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #dc2626;
+}
+
+body.light-theme .comparison-panel {
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+body.light-theme .file-content {
+    color: rgba(0, 0, 0, 0.85);
+    background: rgba(0, 0, 0, 0.03);
+}
+
+body.light-theme .file-content::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+body.light-theme .file-content::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+body.light-theme .file-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+body.light-theme .change-history-container .empty-state {
+    color: rgba(0, 0, 0, 0.5);
 }

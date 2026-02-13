@@ -1,0 +1,3 @@
+If MSSQL Server service suddenly stopped, you need to collect logs from several places to identify the root cause (crash, disk full, memory issue, Windows patch, etc.).
+
+Here’s a step-by-step guide:

@@ -28,10 +28,19 @@ class ApiService {
      * Handle API response
      */
     async handleResponse(response) {
-        const data = await response.json();
+        // Handle 204 No Content responses (empty body)
+        if (response.status === 204) {
+            if (!response.ok) {
+                throw new Error('An error occurred');
+            }
+            return null;
+        }
+
+        const text = await response.text();
+        const data = text ? JSON.parse(text) : null;
 
         if (!response.ok) {
-            throw new Error(data.message || 'An error occurred');
+            throw new Error(data?.message || 'An error occurred');
         }
 
         return data;

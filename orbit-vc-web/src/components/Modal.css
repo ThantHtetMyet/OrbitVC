@@ -153,3 +153,66 @@
 .modal-container.info .modal-button:hover {
     background: rgba(255, 255, 255, 0.2);
 }
+
+/* ============================================
+   Light Theme Styles
+   ============================================ */
+
+body.light-theme .modal-overlay {
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+body.light-theme .modal-container {
+    background: rgba(255, 255, 255, 0.98);
+    border: 1px solid rgba(0, 119, 182, 0.2);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+body.light-theme .modal-icon-badge {
+    background: rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+body.light-theme .modal-title {
+    color: #1a1f2e;
+}
+
+body.light-theme .modal-content {
+    color: rgba(0, 0, 0, 0.7);
+}
+
+body.light-theme .modal-container.success {
+    border-color: rgba(0, 119, 182, 0.4);
+    box-shadow: 0 10px 40px rgba(0, 119, 182, 0.15);
+}
+
+body.light-theme .modal-container.success .modal-icon-badge {
+    background: rgba(0, 119, 182, 0.1);
+    border-color: rgba(0, 119, 182, 0.5);
+    color: #0077b6;
+}
+
+body.light-theme .modal-container.error {
+    border-color: rgba(220, 38, 38, 0.4);
+    box-shadow: 0 10px 40px rgba(220, 38, 38, 0.15);
+}
+
+body.light-theme .modal-container.error .modal-icon-badge {
+    background: rgba(220, 38, 38, 0.1);
+    border-color: rgba(220, 38, 38, 0.5);
+    color: #dc2626;
+}
+
+body.light-theme .modal-container.info {
+    border-color: rgba(0, 0, 0, 0.2);
+}
+
+body.light-theme .modal-container.info .modal-button {
+    background: rgba(0, 0, 0, 0.05);
+    color: #1a1f2e;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+body.light-theme .modal-container.info .modal-button:hover {
+    background: rgba(0, 0, 0, 0.1);
+}

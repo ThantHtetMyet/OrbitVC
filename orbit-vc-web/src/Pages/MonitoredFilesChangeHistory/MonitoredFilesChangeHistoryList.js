@@ -158,7 +158,16 @@ const MonitoredFilesChangeHistoryList = ({ versionId, version, onBack }) => {
 
             {selectedHistory && (
                 <div className="comparison-section">
-                    <h4>Comparison: Original vs Change #{selectedHistory.versionNo}</h4>
+                    <div className="comparison-header">
+                        <h4>Comparison: Original vs Change #{selectedHistory.versionNo}</h4>
+                        <button
+                            className="btn-close-comparison"
+                            onClick={() => setSelectedHistory(null)}
+                            title="Close comparison"
+                        >
+                            ✕
+                        </button>
+                    </div>
                     {loadingContent ? (
                         <LoadingSpinner fullScreen={false} size="small" />
                     ) : (

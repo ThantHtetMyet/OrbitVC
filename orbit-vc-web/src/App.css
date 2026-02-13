@@ -319,6 +319,50 @@
   transform: translateY(-2px);
 }
 
+/* Red Glass Icon - Logout */
+.glass-icon-red {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(220, 38, 38, 0.2) 100%);
+  box-shadow:
+    0 4px 16px rgba(239, 68, 68, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.glass-icon-red svg {
+  stroke: #ef4444;
+  filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.5));
+}
+
+.nav-item:hover .glass-icon-red,
+.logout-btn:hover .glass-icon-red {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.5) 0%, rgba(220, 38, 38, 0.35) 100%);
+  box-shadow:
+    0 6px 24px rgba(239, 68, 68, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+/* Purple Glass Icon - Theme Toggle */
+.glass-icon-purple {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.3) 0%, rgba(139, 92, 246, 0.2) 100%);
+  box-shadow:
+    0 4px 16px rgba(168, 85, 247, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.glass-icon-purple svg {
+  stroke: #a855f7;
+  filter: drop-shadow(0 0 4px rgba(168, 85, 247, 0.5));
+}
+
+.nav-item:hover .glass-icon-purple,
+.theme-toggle-btn:hover .glass-icon-purple {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.5) 0%, rgba(139, 92, 246, 0.35) 100%);
+  box-shadow:
+    0 6px 24px rgba(168, 85, 247, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
 /* Notification Badge */
 .notification-badge {
   position: absolute;
@@ -358,6 +402,23 @@
   }
 }
 
+/* Shake animation for new alerts */
+@keyframes shake-alert {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: rotate(-8deg);
+  }
+  20%, 40%, 60%, 80% {
+    transform: rotate(8deg);
+  }
+}
+
+.glass-icon-orange.shake {
+  animation: shake-alert 0.6s ease-in-out;
+}
+
 .nav-label {
   font-weight: 500;
   opacity: 1;
@@ -389,8 +450,13 @@
 .sidebar-footer {
   padding: 16px 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
+/* Theme Toggle & Logout Buttons */
+.theme-toggle-btn,
 .logout-btn {
   display: flex;
   align-items: center;
@@ -408,37 +474,23 @@
   white-space: nowrap;
 }
 
+.theme-toggle-btn:hover {
+  background: rgba(168, 85, 247, 0.15);
+  color: #a855f7;
+}
+
 .logout-btn:hover {
   background: rgba(239, 68, 68, 0.15);
   color: #ef4444;
 }
 
-.logout-btn:hover .nav-icon {
-  transform: scale(1.15);
-}
-
-.logout-btn:hover .logout-icon svg {
-  stroke: #ef4444;
-}
-
-.logout-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.logout-icon svg {
-  width: 20px;
-  height: 20px;
-  stroke: rgba(255, 255, 255, 0.7);
-  transition: all 0.2s ease;
-}
-
+.sidebar.collapsed .theme-toggle-btn,
 .sidebar.collapsed .logout-btn {
   justify-content: center;
   padding: 14px;
 }
 
+.sidebar.collapsed .theme-toggle-btn .nav-label,
 .sidebar.collapsed .logout-btn .nav-label {
   display: none;
 }
@@ -453,10 +505,14 @@
   min-height: 100vh;
   background: linear-gradient(135deg, #0a0f1a 0%, #1a1f2e 100%);
   transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow-x: hidden;
+  max-width: calc(100vw - 240px);
+  box-sizing: border-box;
 }
 
 .app-layout.sidebar-collapsed .main-content {
   margin-left: 72px;
+  max-width: calc(100vw - 72px);
 }
 
 /* ============================================
@@ -464,11 +520,13 @@
    ============================================ */
 
 .sidebar.collapsed .nav-item,
+.sidebar.collapsed .theme-toggle-btn,
 .sidebar.collapsed .logout-btn {
   position: relative;
 }
 
 .sidebar.collapsed .nav-item::after,
+.sidebar.collapsed .theme-toggle-btn::after,
 .sidebar.collapsed .logout-btn::after {
   content: attr(title);
   position: absolute;
@@ -492,6 +550,7 @@
 }
 
 .sidebar.collapsed .nav-item:hover::after,
+.sidebar.collapsed .theme-toggle-btn:hover::after,
 .sidebar.collapsed .logout-btn:hover::after {
   opacity: 1;
   visibility: visible;
@@ -518,4 +577,133 @@
   .app-layout.sidebar-collapsed .main-content {
     margin-left: 0;
   }
+}
+
+/* ============================================
+   Light Theme
+   ============================================ */
+
+body.light-theme {
+  background: #f5f7fa;
+}
+
+body.light-theme .sidebar {
+  background: linear-gradient(180deg, #ffffff 0%, #f0f2f5 100%);
+  border-right: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.08);
+}
+
+body.light-theme .logo {
+  color: #1a1f2e;
+}
+
+body.light-theme .sidebar-header {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+body.light-theme .collapse-btn {
+  color: #666;
+}
+
+body.light-theme .collapse-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #333;
+}
+
+body.light-theme .hamburger-line {
+  background: #666;
+}
+
+body.light-theme .hamburger-btn:hover .hamburger-line {
+  background: #333;
+}
+
+body.light-theme .nav-item {
+  color: #555;
+}
+
+body.light-theme .nav-item:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #333;
+}
+
+body.light-theme .nav-item.active {
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+}
+
+body.light-theme .theme-toggle-btn,
+body.light-theme .logout-btn {
+  color: #555;
+}
+
+body.light-theme .theme-toggle-btn:hover {
+  background: rgba(168, 85, 247, 0.1);
+  color: #7c3aed;
+}
+
+body.light-theme .logout-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
+
+body.light-theme .sidebar-footer {
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+body.light-theme .main-content {
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4e7eb 100%);
+}
+
+body.light-theme .sidebar.collapsed .nav-item::after,
+body.light-theme .sidebar.collapsed .theme-toggle-btn::after,
+body.light-theme .sidebar.collapsed .logout-btn::after {
+  background: rgba(255, 255, 255, 0.98);
+  color: #333;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* Light theme glass icons adjustments */
+body.light-theme .glass-icon {
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+body.light-theme .notification-badge {
+  box-shadow:
+    0 2px 8px rgba(239, 68, 68, 0.4),
+    0 0 0 2px #ffffff;
+}
+
+/* ============================================
+   Dashboard Page
+   ============================================ */
+
+.dashboard-container {
+  padding: 40px;
+}
+
+.dashboard-title {
+  color: #fff;
+  font-size: 28px;
+  font-weight: 600;
+  margin: 0 0 16px 0;
+}
+
+.dashboard-subtitle {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 16px;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Dashboard Light Theme */
+body.light-theme .dashboard-title {
+  color: #1a1f2e;
+}
+
+body.light-theme .dashboard-subtitle {
+  color: rgba(0, 0, 0, 0.6);
 }

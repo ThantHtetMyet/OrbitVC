@@ -1,5 +1,6 @@
 using orbit_vc_api.Repositories;
 using orbit_vc_api.Repositories.Interfaces;
+using orbit_vc_api.Hubs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -17,6 +18,9 @@ builder.Services.AddScoped<IDeviceRepository, DeviceRepository>();
 builder.Services.AddScoped<IFileControlRepository, FileControlRepository>();
 builder.Services.AddSingleton<orbit_vc_api.Services.ILoggerService, orbit_vc_api.Services.LoggerService>();
 builder.Services.AddHttpContextAccessor(); // Required for accessing User identity in logs
+
+// Add SignalR
+builder.Services.AddSignalR();
 
 // Configure JWT Authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -69,5 +73,8 @@ app.UseAuthentication(); // Must be before Authorization
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Map SignalR Hub
+app.MapHub<AlertHub>("/hubs/alerts");
 
 app.Run();

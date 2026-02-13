@@ -121,13 +121,10 @@ const DeviceList = () => {
             />
 
             {/* Header */}
-            <div className="device-header">
-                <div className="header-left">
-                    <h1 className="page-title">
-                        <span className="title-icon">🖥️</span>
-                        Devices
-                    </h1>
-                    <span className="device-count">{totalCount} devices</span>
+            <div className="device-title-card">
+                <div className="device-title-text">
+                    <h1 className="device-title-name">Devices</h1>
+                    <span className="device-title-hostname">{totalCount} devices</span>
                 </div>
                 <div className="header-actions">
                     <div className="search-wrapper">
@@ -147,8 +144,8 @@ const DeviceList = () => {
             </div>
 
             {/* Device Table */}
-            <div className="device-table-wrapper">
-                <table className="device-table">
+            <div className="simple-card">
+                <table className="simple-table data-table">
                     <thead>
                         <tr>
                             <th>Name</th>

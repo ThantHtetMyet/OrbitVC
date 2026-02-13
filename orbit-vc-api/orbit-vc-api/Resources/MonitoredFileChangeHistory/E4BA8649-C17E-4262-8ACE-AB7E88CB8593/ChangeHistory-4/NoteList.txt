@@ -1,0 +1,29 @@
+ECOND PLACE: Windows Event Viewer (Very Important)
+
+Sometimes SQL log doesn’t show full reason.
+
+Steps:
+
+Press Win + R
+
+Type:
+
+eventvwr
+
+
+Go to:
+
+Windows Logs → Application
+
+
+Filter by:
+
+Date: 27 Dec 2025
+
+Source:
+
+MSSQLSERVER
+
+Service Control Manager
+
+.NET Runtime

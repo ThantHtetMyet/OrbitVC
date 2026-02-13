@@ -1,0 +1,9 @@
+Prevention for the future
+
+Edit scripts directly on VyOS with vi/nano (or sudoedit).
+If editing on Windows → use Notepad++ → Edit → EOL Conversion → Unix (LF)
+Or use VS Code / other editors and set line endings to LF.
+Avoid copy-paste from Windows terminals/docs without cleaning.
+
+Once \r is gone, your log() function definition should parse correctly (assuming no other typos like missing semicolons or unbalanced braces). If you still get syntax errors after this, paste the first 25 lines of the cleaned script — the issue will be easier to spot.
+Let me know the output after the sed fix!

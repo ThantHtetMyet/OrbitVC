@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.SignalR;
 using System.IO;
 using System.Diagnostics;
 using System.Text.Json;
@@ -7,6 +8,7 @@ using orbit_vc_api.Models;
 using orbit_vc_api.Models.DTOs;
 using orbit_vc_api.Repositories.Interfaces;
 using orbit_vc_api.Services;
+using orbit_vc_api.Hubs;
 using Microsoft.AspNetCore.Http;
 using System.Security.Cryptography;
 
@@ -21,19 +23,22 @@ namespace orbit_vc_api.Controllers
         private readonly ILoggerService _logger;
         private readonly IConfiguration _configuration;
         private readonly IWebHostEnvironment _env;
+        private readonly IHubContext<AlertHub> _alertHub;
 
         public FileControlController(
-            IFileControlRepository repository, 
+            IFileControlRepository repository,
             IDeviceRepository deviceRepository,
-            ILoggerService logger, 
+            ILoggerService logger,
             IWebHostEnvironment env,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            IHubContext<AlertHub> alertHub)
         {
             _repository = repository;
             _deviceRepository = deviceRepository;
             _logger = logger;
             _env = env;
             _configuration = configuration;
+            _alertHub = alertHub;
         }
 
 
@@ -441,6 +446,10 @@ namespace orbit_vc_api.Controllers
             try
             {
                 var id = await _repository.CreateMonitoredFileAlertAsync(alert);
+
+                // Broadcast alert change to all connected clients (fire and forget, don't fail the request)
+                _ = BroadcastAlertChangedAsync();
+
                 return Ok(id);
             }
             catch (Exception ex)
@@ -457,6 +466,10 @@ namespace orbit_vc_api.Controllers
             {
                 var result = await _repository.AcknowledgeMonitoredFileAlertAsync(id, acknowledgedBy);
                 if (!result) return NotFound();
+
+                // Broadcast alert change to all connected clients (fire and forget, don't fail the request)
+                _ = BroadcastAlertChangedAsync();
+
                 return NoContent();
             }
             catch (Exception ex)
@@ -473,6 +486,10 @@ namespace orbit_vc_api.Controllers
             {
                 var result = await _repository.ClearMonitoredFileAlertAsync(id, clearedBy);
                 if (!result) return NotFound();
+
+                // Broadcast alert change to all connected clients (fire and forget, don't fail the request)
+                _ = BroadcastAlertChangedAsync();
+
                 return NoContent();
             }
             catch (Exception ex)
@@ -485,6 +502,19 @@ namespace orbit_vc_api.Controllers
         #endregion
 
         #region Helpers
+
+        private async Task BroadcastAlertChangedAsync()
+        {
+            try
+            {
+                await _alertHub.Clients.All.SendAsync("AlertChanged");
+            }
+            catch (Exception ex)
+            {
+                // Log but don't fail - SignalR broadcast is best-effort
+                _logger.LogError("System", "SIGNALR_BROADCAST_ERROR", "Failed to broadcast alert change", ex);
+            }
+        }
 
         private async Task<FileInfoResult> RunGetFileInfoAsync(string ipAddress, string filePath, string? destPath = null)
         {
