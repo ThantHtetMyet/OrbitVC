@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import apiService from '../../services/api-service';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import '../Device/Device.css';
+import '../MonitoredFilesChangeHistory/MonitoredFilesChangeHistory.css';
 
 const MonitoredFileDetails = ({ fileId, onBack, isEmbedded = false, onViewChangeHistory }) => {
     const { id } = useParams(); // File ID from URL if not embedded
@@ -68,6 +69,14 @@ const MonitoredFileDetails = ({ fileId, onBack, isEmbedded = false, onViewChange
         }
     };
 
+    const handleCopyHash = async (hash) => {
+        try {
+            await navigator.clipboard.writeText(hash);
+        } catch (error) {
+            console.error('Failed to copy hash:', error);
+        }
+    };
+
     if (loading) return <LoadingSpinner fullScreen={!isEmbedded} size="small" />;
 
     if (isEmbedded) {
@@ -90,9 +99,9 @@ const MonitoredFileDetails = ({ fileId, onBack, isEmbedded = false, onViewChange
                         <thead>
                             <tr>
                                 <th>Version</th>
-                                <th>Date Modified</th>
-                                <th>Detected Date</th>
+                                <th>File Name</th>
                                 <th>Size</th>
+                                <th>File Hash</th>
                                 <th>Absolute Path</th>
                                 {onViewChangeHistory && <th>Actions</th>}
                             </tr>
@@ -106,9 +115,24 @@ const MonitoredFileDetails = ({ fileId, onBack, isEmbedded = false, onViewChange
                                     title={onViewChangeHistory ? "Click to view change history" : ""}
                                 >
                                     <td>{v.versionNo}</td>
-                                    <td>{v.fileDateModified ? new Date(v.fileDateModified).toLocaleString() : '-'}</td>
-                                    <td>{v.detectedDate ? new Date(v.detectedDate).toLocaleString() : '-'}</td>
+                                    <td className="name-cell">{v.fileName || '-'}</td>
                                     <td>{formatFileSize(v.fileSize)}</td>
+                                    <td className="hash-cell">
+                                        <span className="hash-value" data-hash={v.fileHash}>
+                                            {v.fileHash?.substring(0, 16)}...
+                                            <span className="hash-tooltip">{v.fileHash}</span>
+                                        </span>
+                                        <button
+                                            className="btn-copy"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleCopyHash(v.fileHash);
+                                            }}
+                                            title="Copy full hash"
+                                        >
+                                            📋
+                                        </button>
+                                    </td>
                                     <td className="path-cell">{constructUncPath(v.ipAddress, v.absoluteDirectory)}</td>
                                     {onViewChangeHistory && (
                                         <td>
@@ -156,9 +180,9 @@ const MonitoredFileDetails = ({ fileId, onBack, isEmbedded = false, onViewChange
                         <thead>
                             <tr>
                                 <th>Version</th>
-                                <th>Date Modified</th>
-                                <th>Detected Date</th>
+                                <th>File Name</th>
                                 <th>Size</th>
+                                <th>File Hash</th>
                                 <th>Absolute Path</th>
                             </tr>
                         </thead>
@@ -166,9 +190,21 @@ const MonitoredFileDetails = ({ fileId, onBack, isEmbedded = false, onViewChange
                             {versions.map(v => (
                                 <tr key={v.id}>
                                     <td>{v.versionNo}</td>
-                                    <td>{v.fileDateModified ? new Date(v.fileDateModified).toLocaleString() : '-'}</td>
-                                    <td>{v.detectedDate ? new Date(v.detectedDate).toLocaleString() : '-'}</td>
+                                    <td className="name-cell">{v.fileName || '-'}</td>
                                     <td>{formatFileSize(v.fileSize)}</td>
+                                    <td className="hash-cell">
+                                        <span className="hash-value" data-hash={v.fileHash}>
+                                            {v.fileHash?.substring(0, 16)}...
+                                            <span className="hash-tooltip">{v.fileHash}</span>
+                                        </span>
+                                        <button
+                                            className="btn-copy"
+                                            onClick={() => handleCopyHash(v.fileHash)}
+                                            title="Copy full hash"
+                                        >
+                                            📋
+                                        </button>
+                                    </td>
                                     <td className="path-cell">{constructUncPath(v.ipAddress, v.absoluteDirectory)}</td>
                                 </tr>
                             ))}

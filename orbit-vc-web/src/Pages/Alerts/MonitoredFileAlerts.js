@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiService from '../../services/api-service';
+import signalRService from '../../services/signalr-service';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import Modal from '../../components/Modal';
 import '../Device/Device.css'; // Reuse table styles
@@ -56,6 +57,7 @@ const MonitoredFileAlerts = () => {
             const username = user ? (user.userId || user.sub) : 'Unknown';
             await apiService.acknowledgeAlert(alert.id, username);
             fetchAlerts(); // Refresh list to update status
+            signalRService.notifyAlertChanged(); // Update sidebar badge
         } catch (error) {
             showModal('Error', 'Failed to acknowledge alert', 'error');
         }
@@ -67,6 +69,7 @@ const MonitoredFileAlerts = () => {
             const username = user ? (user.userId || user.sub) : 'Unknown';
             await apiService.clearAlert(alert.id, username);
             fetchAlerts(); // Refresh list
+            signalRService.notifyAlertChanged(); // Update sidebar badge
         } catch (error) {
             showModal('Error', 'Failed to clear alert', 'error');
         }

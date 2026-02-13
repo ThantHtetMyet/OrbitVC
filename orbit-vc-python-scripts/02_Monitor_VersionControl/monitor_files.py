@@ -50,7 +50,9 @@ def run(config):
         cursor = conn.cursor()
 
         # Get all monitored files with their latest version info
-        # File path info comes from MonitoredFileVersions, hash comparison from MonitoredFileChangeHistory
+        # IMPORTANT: Always compare against the ORIGINAL version hash (v.FileHash), NOT change history
+        # This ensures that after restore, the file is considered "in sync" with the original
+        # Change history is only for tracking detected changes, not for determining expected state
         cursor.execute("""
             SELECT
                 mf.ID,
@@ -59,15 +61,13 @@ def run(config):
                 v.AbsoluteDirectory,
                 v.FileName,
                 v.ParentDirectory,
-                COALESCE(ch.FileHash, v.FileHash) AS FileHash,
-                COALESCE(ch.FileSize, v.FileSize) AS FileSize,
-                COALESCE(ch.FileDateModified, v.FileDateModified) AS FileDateModified,
-                COALESCE(ch.VersionNo, 0) AS ChangeHistoryVersionNo
+                v.FileHash,
+                v.FileSize,
+                v.FileDateModified,
+                COALESCE((SELECT MAX(VersionNo) FROM MonitoredFileChangeHistory WHERE MonitoredFileID = mf.ID), 0) AS ChangeHistoryVersionNo
             FROM MonitoredFiles mf
             LEFT JOIN MonitoredFileVersions v ON mf.ID = v.MonitoredFileID
                 AND v.VersionNo = (SELECT MAX(VersionNo) FROM MonitoredFileVersions WHERE MonitoredFileID = mf.ID)
-            LEFT JOIN MonitoredFileChangeHistory ch ON mf.ID = ch.MonitoredFileID
-                AND ch.VersionNo = (SELECT MAX(VersionNo) FROM MonitoredFileChangeHistory WHERE MonitoredFileID = mf.ID)
             WHERE mf.IsDeleted = 0
         """)
 

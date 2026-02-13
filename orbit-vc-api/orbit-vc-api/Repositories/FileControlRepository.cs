@@ -381,6 +381,13 @@ namespace orbit_vc_api.Repositories
             return await connection.QuerySingleOrDefaultAsync<MonitoredFileChangeHistory>(sql, new { FileId = fileId });
         }
 
+        public async Task<int> DeleteChangeHistoryByVersionIdAsync(Guid versionId)
+        {
+            using var connection = CreateConnection();
+            const string sql = "DELETE FROM MonitoredFileChangeHistory WHERE MonitoredFileVersionID = @VersionId";
+            return await connection.ExecuteAsync(sql, new { VersionId = versionId });
+        }
+
         #endregion
     }
 }

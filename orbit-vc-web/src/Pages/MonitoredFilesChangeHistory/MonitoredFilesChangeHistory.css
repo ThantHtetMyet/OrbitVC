@@ -47,6 +47,33 @@
     cursor: not-allowed;
 }
 
+/* Sync Status Indicator */
+.sync-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.sync-status.in-sync {
+    background: linear-gradient(135deg, rgba(74, 222, 128, 0.15) 0%, rgba(34, 197, 94, 0.1) 100%);
+    border: 1px solid rgba(74, 222, 128, 0.3);
+    color: #4ade80;
+}
+
+.sync-status .sync-icon {
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.sync-status .sync-text {
+    font-weight: 500;
+}
+
 /* Version Info Card */
 .version-info-card {
     background: rgba(0, 212, 255, 0.08);
@@ -143,8 +170,68 @@
     background: rgba(0, 212, 255, 0.1);
 }
 
-.change-history-container .simple-table tr:hover {
+.change-history-container .simple-table tr.selected.expanded {
+    background: rgba(0, 212, 255, 0.15);
+    border-bottom: none;
+}
+
+.change-history-container .simple-table tr.selected.expanded td {
+    border-bottom: none;
+}
+
+.change-history-container .simple-table tr:hover:not(.expandable-row) {
     background: rgba(255, 255, 255, 0.03);
+}
+
+/* Expandable Row */
+.expandable-row {
+    background: rgba(10, 15, 26, 0.8);
+}
+
+.expandable-row td {
+    padding: 0 !important;
+    border-bottom: 1px solid rgba(0, 212, 255, 0.2) !important;
+}
+
+.expandable-content {
+    padding: 20px;
+    animation: expandIn 0.3s ease-out;
+}
+
+@keyframes expandIn {
+    from {
+        opacity: 0;
+        max-height: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        max-height: 1000px;
+        transform: translateY(0);
+    }
+}
+
+.comparison-header-inline {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.comparison-header-inline span {
+    color: #00d4ff;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+/* Active compare button */
+.btn-compare.active {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.15) 100%);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #ef4444;
 }
 
 /* Hash Cell with Copy Button */
@@ -152,28 +239,146 @@
     white-space: nowrap;
 }
 
-.hash-cell span {
+.hash-value {
+    position: relative;
+    display: inline-block;
+    cursor: pointer;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.8);
+    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    transition: all 0.2s ease;
     margin-right: 8px;
+    vertical-align: middle;
+}
+
+.hash-value:hover {
+    background: rgba(0, 212, 255, 0.1);
+    color: #00d4ff;
+}
+
+/* Glass Tooltip */
+.hash-tooltip {
+    position: absolute;
+    bottom: calc(100% + 12px);
+    left: 50%;
+    transform: translateX(-50%) scale(0.9);
+    padding: 14px 18px;
+    min-width: 320px;
+
+    /* Glass morphism effect */
+    background: linear-gradient(135deg,
+            rgba(255, 255, 255, 0.12) 0%,
+            rgba(255, 255, 255, 0.05) 50%,
+            rgba(0, 212, 255, 0.08) 100%);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 12px;
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.4),
+        0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+        0 1px 0 rgba(255, 255, 255, 0.1) inset;
+
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 11px;
+    color: #fff;
+    letter-spacing: 0.5px;
+    word-break: break-all;
+    line-height: 1.6;
+    text-align: center;
+
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 100;
+}
+
+/* Tooltip arrow */
+.hash-tooltip::before {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 14px;
+    height: 14px;
+    background: linear-gradient(135deg,
+            transparent 50%,
+            rgba(255, 255, 255, 0.08) 50%);
+    border-right: 1px solid rgba(255, 255, 255, 0.15);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+/* Show tooltip on hover */
+.hash-value:hover .hash-tooltip {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) scale(1);
+}
+
+/* Subtle glow animation on hover */
+.hash-value:hover .hash-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 12px;
+    background: linear-gradient(90deg,
+            transparent 0%,
+            rgba(0, 212, 255, 0.1) 50%,
+            transparent 100%);
+    animation: glassShimmer 2s ease infinite;
+    pointer-events: none;
+}
+
+@keyframes glassShimmer {
+    0% {
+        transform: translateX(-100%);
+    }
+
+    100% {
+        transform: translateX(100%);
+    }
 }
 
 .btn-copy {
+    display: inline-block;
     background: transparent;
     border: none;
     cursor: pointer;
-    padding: 2px 4px;
+    padding: 4px 6px;
     font-size: 12px;
     opacity: 0.6;
-    transition: opacity 0.2s ease;
+    transition: all 0.2s ease;
     vertical-align: middle;
+    border-radius: 4px;
 }
 
 .btn-copy:hover {
     opacity: 1;
+    background: rgba(255, 255, 255, 0.1);
 }
 
 /* Action Buttons */
 .actions-cell {
     white-space: nowrap;
+}
+
+.actions-cell .btn-action {
+    margin-left: 8px;
+}
+
+.actions-cell .btn-action:first-child {
+    margin-left: 0;
 }
 
 .btn-action {
@@ -368,6 +573,7 @@
         opacity: 0;
         transform: translateY(-20px) scale(0.95);
     }
+
     to {
         opacity: 1;
         transform: translateY(0) scale(1);
@@ -526,6 +732,13 @@ body.light-theme .change-history-container .empty-state {
     color: rgba(0, 0, 0, 0.5);
 }
 
+/* Light theme - Sync Status */
+body.light-theme .sync-status.in-sync {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.12) 0%, rgba(22, 163, 74, 0.08) 100%);
+    border: 1px solid rgba(34, 197, 94, 0.25);
+    color: #16a34a;
+}
+
 /* Light theme - Restore Button */
 body.light-theme .btn-restore {
     background: linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(22, 163, 74, 0.1) 100%);
@@ -555,4 +768,110 @@ body.light-theme .restore-modal-title {
 
 body.light-theme .restore-modal-message {
     color: rgba(0, 0, 0, 0.6);
+}
+
+/* Light theme - Hash Value and Glass Tooltip */
+body.light-theme .hash-value {
+    color: rgba(0, 0, 0, 0.75);
+    background: rgba(0, 0, 0, 0.04);
+}
+
+body.light-theme .hash-value:hover {
+    background: rgba(0, 119, 182, 0.1);
+    color: #0077b6;
+}
+
+body.light-theme .hash-tooltip {
+    background: linear-gradient(135deg,
+            rgba(255, 255, 255, 0.9) 0%,
+            rgba(255, 255, 255, 0.8) 50%,
+            rgba(0, 119, 182, 0.1) 100%);
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.15),
+        0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+    color: #1a1f2e;
+}
+
+/* Header Actions */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.btn-icon-download {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: inherit;
+    border-radius: 4px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0;
+    transition: all 0.2s ease;
+}
+
+.btn-icon-download:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
+
+/* Light Theme overrides for icon button */
+body.light-theme .btn-icon-download {
+    border-color: rgba(0, 0, 0, 0.2);
+}
+
+body.light-theme .btn-icon-download:hover {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+body.light-theme .hash-tooltip::before {
+    background: linear-gradient(135deg,
+            transparent 50%,
+            rgba(255, 255, 255, 0.85) 50%);
+    border-right: 1px solid rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+body.light-theme .hash-value:hover .hash-tooltip::after {
+    background: linear-gradient(90deg,
+            transparent 0%,
+            rgba(0, 119, 182, 0.08) 50%,
+            transparent 100%);
+}
+
+body.light-theme .btn-copy:hover {
+    background: rgba(0, 0, 0, 0.08);
+}
+
+/* Light theme - Expandable Row */
+body.light-theme .change-history-container .simple-table tr.selected.expanded {
+    background: rgba(0, 119, 182, 0.12);
+}
+
+body.light-theme .expandable-row {
+    background: rgba(255, 255, 255, 0.95);
+}
+
+body.light-theme .expandable-row td {
+    border-bottom: 1px solid rgba(0, 119, 182, 0.2) !important;
+}
+
+body.light-theme .comparison-header-inline {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+body.light-theme .comparison-header-inline span {
+    color: #0077b6;
+}
+
+body.light-theme .btn-compare.active {
+    background: linear-gradient(135deg, rgba(220, 38, 38, 0.15) 0%, rgba(185, 28, 28, 0.1) 100%);
+    border: 1px solid rgba(220, 38, 38, 0.3);
+    color: #dc2626;
 }

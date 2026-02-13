@@ -39,5 +39,6 @@ namespace orbit_vc_api.Repositories.Interfaces
         Task<IEnumerable<MonitoredFileChangeHistory>> GetChangeHistoryByVersionIdAsync(Guid versionId);
         Task<MonitoredFileChangeHistory?> GetChangeHistoryByIdAsync(Guid id);
         Task<MonitoredFileChangeHistory?> GetLatestChangeHistoryAsync(Guid fileId);
+        Task<int> DeleteChangeHistoryByVersionIdAsync(Guid versionId);
     }
 }

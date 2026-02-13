@@ -437,6 +437,13 @@ class ApiService {
     }
 
     /**
+     * Get alerts by monitored file ID
+     */
+    async getAlertsByFileId(fileId) {
+        return await this.get(`/FileControl/alerts/file/${fileId}`);
+    }
+
+    /**
      * Acknowledge an alert
      */
     async acknowledgeAlert(id, acknowledgedBy) {

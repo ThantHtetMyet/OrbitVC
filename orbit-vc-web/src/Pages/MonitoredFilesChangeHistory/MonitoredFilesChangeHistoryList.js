@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import apiService from '../../services/api-service';
+import signalRService from '../../services/signalr-service';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import './MonitoredFilesChangeHistory.css';
 
@@ -12,21 +13,32 @@ const MonitoredFilesChangeHistoryList = ({ versionId, version, onBack }) => {
     const [loadingContent, setLoadingContent] = useState(false);
     const [restoreLoading, setRestoreLoading] = useState(false);
     const [restoreModal, setRestoreModal] = useState({ isOpen: false, success: false, message: '' });
+    const [hasUnclearedAlerts, setHasUnclearedAlerts] = useState(false);
 
     useEffect(() => {
-        const fetchChangeHistory = async () => {
+        const fetchData = async () => {
             if (!versionId) return;
             try {
-                const data = await apiService.getChangeHistoryByVersionId(versionId);
-                setChangeHistory(data);
+                // Fetch change history
+                const historyData = await apiService.getChangeHistoryByVersionId(versionId);
+                setChangeHistory(historyData);
+
+                // Fetch alerts to check sync status (if we have monitoredFileID)
+                // Only show "Restore Original" if there are uncleared AND unacknowledged alerts
+                // Acknowledged alerts are preserved after restore for tracking purposes
+                if (version?.monitoredFileID) {
+                    const alerts = await apiService.getAlertsByFileId(version.monitoredFileID);
+                    const needsRestore = alerts.some(a => !a.isCleared && !a.isAcknowledged);
+                    setHasUnclearedAlerts(needsRestore);
+                }
             } catch (error) {
-                console.error('Error fetching change history:', error);
+                console.error('Error fetching data:', error);
             } finally {
                 setLoading(false);
             }
         };
-        fetchChangeHistory();
-    }, [versionId]);
+        fetchData();
+    }, [versionId, version?.monitoredFileID]);
 
     const handleDownloadHistory = async (history) => {
         try {
@@ -45,7 +57,32 @@ const MonitoredFilesChangeHistoryList = ({ versionId, version, onBack }) => {
         }
     };
 
+    const handleDownloadOriginal = async () => {
+        try {
+            const blob = await apiService.downloadVersionFile(versionId);
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `original-${version?.versionNo}-${version?.fileName || 'file'}`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            a.remove();
+        } catch (error) {
+            console.error('Error downloading original file:', error);
+            alert('Failed to download file');
+        }
+    };
+
     const handleCompare = async (history) => {
+        // Toggle off if clicking the same row
+        if (selectedHistory?.id === history.id) {
+            setSelectedHistory(null);
+            setVersionContent(null);
+            setHistoryContent(null);
+            return;
+        }
+
         setSelectedHistory(history);
         setLoadingContent(true);
         setVersionContent(null);
@@ -102,6 +139,12 @@ const MonitoredFilesChangeHistoryList = ({ versionId, version, onBack }) => {
                 success: true,
                 message: result.message || `File restored successfully to ${result.destinationPath || version?.absoluteDirectory}`
             });
+            // Mark as in sync (alerts were auto-cleared on server)
+            setHasUnclearedAlerts(false);
+            // Close any open comparison panel
+            setSelectedHistory(null);
+            // Update sidebar badge since alerts were auto-cleared
+            signalRService.notifyAlertChanged();
         } catch (error) {
             console.error('Error restoring file:', error);
             setRestoreModal({
@@ -127,14 +170,23 @@ const MonitoredFilesChangeHistoryList = ({ versionId, version, onBack }) => {
                     &larr;
                 </button>
                 <h3>Change History: {version?.fileName || 'Loading...'}</h3>
-                <button
-                    className="btn-restore"
-                    onClick={handleRestore}
-                    disabled={restoreLoading}
-                    title="Restore original file to target location"
-                >
-                    {restoreLoading ? 'Restoring...' : 'Restore Original'}
-                </button>
+
+                {/* Show sync status or restore button based on alert status */}
+                {!hasUnclearedAlerts ? (
+                    <div className="sync-status in-sync">
+                        <span className="sync-icon">✓</span>
+                        <span className="sync-text">In Sync</span>
+                    </div>
+                ) : (
+                    <button
+                        className="btn-restore"
+                        onClick={handleRestore}
+                        disabled={restoreLoading}
+                        title="Restore original file to target location"
+                    >
+                        {restoreLoading ? 'Restoring...' : 'Restore Original'}
+                    </button>
+                )}
             </div>
 
             <div className="change-history-section">
@@ -152,37 +204,92 @@ const MonitoredFilesChangeHistoryList = ({ versionId, version, onBack }) => {
                         </thead>
                         <tbody>
                             {changeHistory.map(h => (
-                                <tr key={h.id} className={selectedHistory?.id === h.id ? 'selected' : ''}>
-                                    <td>{h.versionNo}</td>
-                                    <td>{h.detectedDate ? new Date(h.detectedDate).toLocaleString() : '-'}</td>
-                                    <td>{formatFileSize(h.fileSize)}</td>
-                                    <td className="hash-cell" title={h.fileHash}>
-                                        {h.fileHash?.substring(0, 16)}...
-                                        <button
-                                            className="btn-copy"
-                                            onClick={() => handleCopyHash(h.fileHash)}
-                                            title="Copy full hash"
-                                        >
-                                            📋
-                                        </button>
-                                    </td>
-                                    <td className="actions-cell">
-                                        <button
-                                            className="btn-action btn-compare"
-                                            onClick={() => handleCompare(h)}
-                                            title="Compare with original"
-                                        >
-                                            Compare
-                                        </button>
-                                        <button
-                                            className="btn-action btn-download-sm"
-                                            onClick={() => handleDownloadHistory(h)}
-                                            title="Download this version"
-                                        >
-                                            Download
-                                        </button>
-                                    </td>
-                                </tr>
+                                <React.Fragment key={h.id}>
+                                    <tr className={`${selectedHistory?.id === h.id ? 'selected expanded' : ''}`}>
+                                        <td>{h.versionNo}</td>
+                                        <td>{h.detectedDate ? new Date(h.detectedDate).toLocaleString() : '-'}</td>
+                                        <td>{formatFileSize(h.fileSize)}</td>
+                                        <td className="hash-cell">
+                                            <span className="hash-value" data-hash={h.fileHash}>
+                                                {h.fileHash?.substring(0, 16)}...
+                                                <span className="hash-tooltip">{h.fileHash}</span>
+                                            </span>
+                                            <button
+                                                className="btn-copy"
+                                                onClick={() => handleCopyHash(h.fileHash)}
+                                                title="Copy full hash"
+                                            >
+                                                📋
+                                            </button>
+                                        </td>
+                                        <td className="actions-cell">
+                                            <button
+                                                className={`btn-action btn-compare ${selectedHistory?.id === h.id ? 'active' : ''}`}
+                                                onClick={() => handleCompare(h)}
+                                                title={selectedHistory?.id === h.id ? 'Close comparison' : 'Compare with original'}
+                                            >
+                                                {selectedHistory?.id === h.id ? 'Close' : 'Compare'}
+                                            </button>
+                                            <button
+                                                className="btn-action btn-download-sm"
+                                                onClick={() => handleDownloadHistory(h)}
+                                                title="Download this version"
+                                            >
+                                                Download
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {/* Expandable comparison row */}
+                                    {selectedHistory?.id === h.id && (
+                                        <tr className="expandable-row">
+                                            <td colSpan="5">
+                                                <div className="expandable-content">
+                                                    <div className="comparison-header-inline">
+                                                        <span>Comparison: Original vs Change #{h.versionNo}</span>
+                                                    </div>
+                                                    {loadingContent ? (
+                                                        <LoadingSpinner fullScreen={false} size="small" />
+                                                    ) : (
+                                                        <div className="comparison-panels">
+                                                            <div className="comparison-panel">
+                                                                <div className="panel-header original">
+                                                                    <span>Original (Uploaded Version {version?.versionNo})</span>
+                                                                    <div className="header-actions">
+                                                                        <span className="file-size">{formatFileSize(version?.fileSize)}</span>
+                                                                        <button
+                                                                            className="btn-icon-download"
+                                                                            onClick={handleDownloadOriginal}
+                                                                            title="Download Original"
+                                                                        >
+                                                                            ⬇
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                                <pre className="file-content">{versionContent || 'No content'}</pre>
+                                                            </div>
+                                                            <div className="comparison-panel">
+                                                                <div className="panel-header changed">
+                                                                    <span>Changed (Version - {h.versionNo})</span>
+                                                                    <div className="header-actions">
+                                                                        <span className="file-size">{formatFileSize(h.fileSize)}</span>
+                                                                        <button
+                                                                            className="btn-icon-download"
+                                                                            onClick={() => handleDownloadHistory(h)}
+                                                                            title="Download Changed Version"
+                                                                        >
+                                                                            ⬇
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                                <pre className="file-content">{historyContent || 'No content'}</pre>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </React.Fragment>
                             ))}
                         </tbody>
                     </table>
@@ -192,41 +299,6 @@ const MonitoredFilesChangeHistoryList = ({ versionId, version, onBack }) => {
                     </div>
                 )}
             </div>
-
-            {selectedHistory && (
-                <div className="comparison-section">
-                    <div className="comparison-header">
-                        <h4>Comparison: Original vs Change #{selectedHistory.versionNo}</h4>
-                        <button
-                            className="btn-close-comparison"
-                            onClick={() => setSelectedHistory(null)}
-                            title="Close comparison"
-                        >
-                            ✕
-                        </button>
-                    </div>
-                    {loadingContent ? (
-                        <LoadingSpinner fullScreen={false} size="small" />
-                    ) : (
-                        <div className="comparison-panels">
-                            <div className="comparison-panel">
-                                <div className="panel-header original">
-                                    <span>Original (Uploaded Version {version?.versionNo})</span>
-                                    <span className="file-size">{formatFileSize(version?.fileSize)}</span>
-                                </div>
-                                <pre className="file-content">{versionContent || 'No content'}</pre>
-                            </div>
-                            <div className="comparison-panel">
-                                <div className="panel-header changed">
-                                    <span>Changed (Version - {selectedHistory.versionNo})</span>
-                                    <span className="file-size">{formatFileSize(selectedHistory.fileSize)}</span>
-                                </div>
-                                <pre className="file-content">{historyContent || 'No content'}</pre>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
 
             {/* Restore Result Modal */}
             {restoreModal.isOpen && (

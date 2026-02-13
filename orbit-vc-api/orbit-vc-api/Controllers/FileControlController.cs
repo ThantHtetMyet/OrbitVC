@@ -434,7 +434,31 @@ namespace orbit_vc_api.Controllers
                 if (restoreResult.Success)
                 {
                     _logger.LogActivity("File Restore Success", $"Restored file: {version.FileName} to {version.AbsoluteDirectory} via {targetIp}");
-                    return Ok(new { success = true, message = restoreResult.Message, destinationPath = $"\\\\{targetIp}\\{version.AbsoluteDirectory}" });
+
+                    // Auto-clear only uncleared AND unacknowledged alerts for this monitored file after successful restore
+                    // Acknowledged alerts are preserved so users can track which alerts were manually reviewed
+                    // Note: Change history is preserved for user viewing - monitoring compares against original version hash
+                    var alerts = await _repository.GetMonitoredFileAlertsAsync(monitoredFile.ID);
+                    var alertsToClear = alerts.Where(a => !a.IsCleared && !a.IsAcknowledged).ToList();
+                    foreach (var alert in alertsToClear)
+                    {
+                        await _repository.ClearMonitoredFileAlertAsync(alert.ID, "System (Auto-cleared after restore)");
+                    }
+
+                    // Broadcast alert change if any alerts were cleared
+                    if (alertsToClear.Any())
+                    {
+                        _ = BroadcastAlertChangedAsync();
+                    }
+
+                    var clearedCount = alertsToClear.Count;
+                    var message = restoreResult.Message;
+                    if (clearedCount > 0)
+                    {
+                        message += $" {clearedCount} alert(s) have been automatically cleared.";
+                    }
+
+                    return Ok(new { success = true, message = message, destinationPath = $"\\\\{targetIp}\\{version.AbsoluteDirectory}", alertsCleared = clearedCount });
                 }
                 else
                 {

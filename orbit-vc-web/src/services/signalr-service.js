@@ -50,6 +50,11 @@ class SignalRService {
             this.alertChangedCallbacks = this.alertChangedCallbacks.filter(cb => cb !== callback);
         };
     }
+
+    // Manually trigger alert changed callbacks (useful when SignalR broadcast might be delayed)
+    notifyAlertChanged() {
+        this.alertChangedCallbacks.forEach(callback => callback());
+    }
 }
 
 const signalRService = new SignalRService();
