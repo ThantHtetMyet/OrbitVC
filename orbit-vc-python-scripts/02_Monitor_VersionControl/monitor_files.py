@@ -42,6 +42,19 @@ def construct_unc_path(ip, full_path_on_device):
     else:
         return full_path_on_device
 
+
+def try_access_file_with_ips(ip_list, full_path_on_device):
+    """
+    Try to access a file using multiple IP addresses in order.
+    Returns (success, unc_path, ip_used) tuple.
+    """
+    for ip in ip_list:
+        unc_path = construct_unc_path(ip, full_path_on_device)
+        if os.path.exists(unc_path):
+            return True, unc_path, ip
+    # Return last attempted path for error reporting
+    return False, construct_unc_path(ip_list[0], full_path_on_device) if ip_list else None, None
+
 def run(config):
     logger.info("Starting Version Control Monitor check...")
     conn = None
@@ -94,28 +107,26 @@ def run(config):
                     logger.warning(f"Missing MonitoredFileVersionID for MonitoredFile {file_id}, skipping")
                     continue
 
-                # Get IP Address (prefer internal IPs)
+                # Get all IP Addresses sorted by IPAddressType name (Network-01, Network-02, etc.)
                 cursor.execute("""
                     SELECT ip.IPAddress
                     FROM DeviceIPAddresses ip
                     LEFT JOIN IPAddressTypes ipt ON ip.IPAddressTypeID = ipt.ID
-                    WHERE ip.DeviceID = ? AND (ip.IPAddress LIKE '10.%' OR ip.IPAddress LIKE '192.%')
+                    WHERE ip.DeviceID = ? AND ip.IsDeleted = 0
+                    ORDER BY ISNULL(ipt.Name, 'zzz')
                 """, device_id)
-                ip_row = cursor.fetchone()
-                if not ip_row:
-                    cursor.execute("SELECT TOP 1 IPAddress FROM DeviceIPAddresses WHERE DeviceID = ?", device_id)
-                    ip_row = cursor.fetchone()
+                ip_rows = cursor.fetchall()
 
-                if not ip_row:
+                if not ip_rows:
                     logger.warning(f"No IP found for device {device_id}, skipping {file_name}")
                     continue
 
-                ip_address = ip_row[0]
+                ip_list = [row[0] for row in ip_rows if row[0]]
 
-                # Construct UNC path using AbsoluteDirectory
-                full_path = construct_unc_path(ip_address, abs_directory)
+                # Try to access file using multiple IPs in priority order
+                file_accessible, full_path, ip_used = try_access_file_with_ips(ip_list, abs_directory)
 
-                if not os.path.exists(full_path):
+                if not file_accessible:
                     # File was deleted - create DELETED alert
                     logger.warning(f"File DELETED or not accessible: {full_path}")
 

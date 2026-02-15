@@ -145,12 +145,10 @@ namespace orbit_vc_api.Controllers
                 // Get Device
                 var device = await _deviceRepository.GetByIdAsync(input.DeviceID);
                 if (device == null) return BadRequest("Device not found");
-                
-                var ipAddresses = await _deviceRepository.GetIPAddressesByDeviceIdAsync(device.ID);
-                string? targetIp = ipAddresses.FirstOrDefault(ip => ip.IPAddress.StartsWith("10.") || ip.IPAddress.StartsWith("192."))?.IPAddress 
-                                ?? ipAddresses.FirstOrDefault()?.IPAddress;
 
-                if (string.IsNullOrEmpty(targetIp)) return BadRequest("No IP address found for device");
+                // Get all IP addresses sorted by priority (Network-01, Network-02, etc.)
+                var sortedIps = await GetSortedIPAddressesAsync(device.ID);
+                if (string.IsNullOrEmpty(sortedIps)) return BadRequest("No IP address found for device");
 
                 var parent = new MonitoredFile
                 {
@@ -199,8 +197,8 @@ namespace orbit_vc_api.Controllers
                         }
                     }
 
-                    // Run python script to get size/hash using IP (and copy if destPath set)
-                    var fileInfo = await RunGetFileInfoAsync(targetIp, fullPath, destPath);
+                    // Run python script to get size/hash using IPs (tries each in order until one succeeds)
+                    var fileInfo = await RunGetFileInfoAsync(sortedIps, fullPath, destPath);
                     
                     if (fileInfo.Success)
                     {
@@ -417,23 +415,21 @@ namespace orbit_vc_api.Controllers
                 var monitoredFile = await _repository.GetMonitoredFileByIdAsync(version.MonitoredFileID);
                 if (monitoredFile == null) return NotFound("Monitored file not found");
 
-                // Get device to get IP address
+                // Get device to get IP addresses
                 var device = await _deviceRepository.GetByIdAsync(monitoredFile.DeviceID);
                 if (device == null) return NotFound("Device not found");
 
-                var ipAddresses = await _deviceRepository.GetIPAddressesByDeviceIdAsync(device.ID);
-                string? targetIp = ipAddresses.FirstOrDefault(ip => ip.IPAddress.StartsWith("10.") || ip.IPAddress.StartsWith("192."))?.IPAddress
-                                ?? ipAddresses.FirstOrDefault()?.IPAddress;
-
-                if (string.IsNullOrEmpty(targetIp))
+                // Get all IP addresses sorted by priority (Network-01, Network-02, etc.)
+                var sortedIps = await GetSortedIPAddressesAsync(device.ID);
+                if (string.IsNullOrEmpty(sortedIps))
                     return BadRequest("No IP address found for device");
 
-                // Run the restore script
-                var restoreResult = await RunRestoreFileAsync(targetIp, version.AbsoluteDirectory, version.StoredDirectory);
+                // Run the restore script (tries each IP in order until one succeeds)
+                var restoreResult = await RunRestoreFileAsync(sortedIps, version.AbsoluteDirectory, version.StoredDirectory);
 
                 if (restoreResult.Success)
                 {
-                    _logger.LogActivity("File Restore Success", $"Restored file: {version.FileName} to {version.AbsoluteDirectory} via {targetIp}");
+                    _logger.LogActivity("File Restore Success", $"Restored file: {version.FileName} to {version.AbsoluteDirectory} via {restoreResult.IpUsed ?? sortedIps}");
 
                     // Auto-clear only uncleared AND unacknowledged alerts for this monitored file after successful restore
                     // Acknowledged alerts are preserved so users can track which alerts were manually reviewed
@@ -458,7 +454,8 @@ namespace orbit_vc_api.Controllers
                         message += $" {clearedCount} alert(s) have been automatically cleared.";
                     }
 
-                    return Ok(new { success = true, message = message, destinationPath = $"\\\\{targetIp}\\{version.AbsoluteDirectory}", alertsCleared = clearedCount });
+                    var ipUsed = restoreResult.IpUsed ?? sortedIps.Split(',').FirstOrDefault() ?? "unknown";
+                    return Ok(new { success = true, message = message, destinationPath = $"\\\\{ipUsed}\\{version.AbsoluteDirectory}", alertsCleared = clearedCount });
                 }
                 else
                 {
@@ -473,7 +470,7 @@ namespace orbit_vc_api.Controllers
             }
         }
 
-        private async Task<RestoreResult> RunRestoreFileAsync(string ipAddress, string destPath, string sourcePath)
+        private async Task<RestoreResult> RunRestoreFileAsync(string ipAddresses, string destPath, string sourcePath)
         {
             try
             {
@@ -485,7 +482,8 @@ namespace orbit_vc_api.Controllers
                     return new RestoreResult { Success = false, Message = "Restore script not found" };
                 }
 
-                var args = $"\"{scriptPath}\" \"{ipAddress}\" \"{destPath}\" \"{sourcePath}\"";
+                // Pass comma-separated IPs - script will try each in order
+                var args = $"\"{scriptPath}\" \"{ipAddresses}\" \"{destPath}\" \"{sourcePath}\"";
 
                 var startInfo = new ProcessStartInfo
                 {
@@ -513,7 +511,8 @@ namespace orbit_vc_api.Controllers
                         if (doc.RootElement.TryGetProperty("success", out var successElement) && successElement.GetBoolean())
                         {
                             var msg = doc.RootElement.TryGetProperty("message", out var m) ? m.GetString() : "File restored successfully";
-                            return new RestoreResult { Success = true, Message = msg };
+                            var ipUsed = doc.RootElement.TryGetProperty("ip_used", out var ip) ? ip.GetString() : null;
+                            return new RestoreResult { Success = true, Message = msg, IpUsed = ipUsed };
                         }
                         else
                         {
@@ -542,6 +541,7 @@ namespace orbit_vc_api.Controllers
         {
             public bool Success { get; set; }
             public string? Message { get; set; }
+            public string? IpUsed { get; set; }
         }
 
 
@@ -746,6 +746,25 @@ namespace orbit_vc_api.Controllers
             public string? FileSize { get; set; }
             public string? FileHash { get; set; }
             public string? FileDateModified { get; set; }
+        }
+
+        /// <summary>
+        /// Gets IP addresses for a device, sorted by IPAddressType name priority (Network-01, Network-02, etc.)
+        /// Returns comma-separated string for use with Python scripts that try multiple IPs.
+        /// </summary>
+        private async Task<string> GetSortedIPAddressesAsync(Guid deviceId)
+        {
+            var ipAddresses = await _deviceRepository.GetIPAddressesByDeviceIdAsync(deviceId);
+
+            // Sort by IPAddressType name (Network-01 before Network-02, etc.)
+            // IPs without a type go last
+            var sortedIps = ipAddresses
+                .OrderBy(ip => ip.IPAddressType?.Name ?? "zzz") // null types sort last
+                .Select(ip => ip.IPAddress)
+                .Where(ip => !string.IsNullOrEmpty(ip))
+                .ToList();
+
+            return string.Join(",", sortedIps);
         }
 
         #endregion
