@@ -8,7 +8,7 @@ def restore_file(ip_address, dest_path, source_path):
     """
     Restore a file from local storage to remote UNC path.
 
-    Args:
+    Arguments:
         ip_address: IP address of the target machine
         dest_path: The destination path on the remote machine (e.g., C:/Users/...)
         source_path: The local source file path to copy from
